@@ -9,12 +9,12 @@ using DSharpPlus.CommandAll.Parsers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using @RepositoryOwner.@RepositoryName.Events;
+using OoLunar.DocBot.Events;
 using Serilog;
 using Serilog.Events;
 using Serilog.Sinks.SystemConsole.Themes;
 
-namespace @RepositoryOwner.@RepositoryName
+namespace OoLunar.DocBot
 {
     public sealed class Program
     {
@@ -28,7 +28,7 @@ namespace @RepositoryOwner.@RepositoryName
 #if DEBUG
                 .AddJsonFile("config.debug.json", true, true)
 #endif
-                .AddEnvironmentVariables("@RepositoryName_")
+                .AddEnvironmentVariables("DocBot_")
                 .Build());
 
             services.AddLogging(loggerBuilder =>

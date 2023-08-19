@@ -4,7 +4,7 @@ on:
       - ".github/workflows/test-template.yml"
       - "src/**"
       - "tools/replace-variables.sh"
-      - "@RepositoryName.sln"
+      - "DocBot.sln"
   workflow_dispatch:
 
 env:

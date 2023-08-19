@@ -5,7 +5,7 @@ on:
     paths:
       - ".github/workflows/build-commit.yml"
       - "src/**"
-      - "@RepositoryName.sln"
+      - "DocBot.sln"
   workflow_dispatch:
 
 env:
@@ -29,4 +29,4 @@ jobs:
       - name: Build Project
         run: dotnet build
       - name: Build Dockerfile
-        run: docker build -t @RepositoryFullNameLower:latest .
+        run: docker build -t oolunar/docbot:latest .

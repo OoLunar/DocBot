@@ -10,7 +10,7 @@ on:
     paths:
       - ".github/workflows/build-pr.yml"
       - "src/**"
-      - "@RepositoryName.sln"
+      - "DocBot.sln"
 
 env:
   DOTNET_NOLOGO: 1
@@ -33,4 +33,4 @@ jobs:
       - name: Build Project
         run: dotnet build
       - name: Build Dockerfile
-        run: docker build -t @RepositoryFullNameLower:latest .
+        run: docker build -t oolunar/docbot:latest .
