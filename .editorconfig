@@ -67,6 +67,9 @@ dotnet_style_prefer_auto_properties = true:error
 dotnet_style_prefer_conditional_expression_over_assignment = true:error
 dotnet_style_prefer_conditional_expression_over_return = true:error
 
+# Don't worry about discards
+dotnet_diagnostic.IDE0058.severity = none
+
 ###############################
 # Naming Conventions          #
 ###############################

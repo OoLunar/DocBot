@@ -11,5 +11,11 @@
         "overrides": {
             "DSharpPlus": "Information"
         }
+    },
+    "nuget": {
+        "path": "packages",
+        "packages": [
+            "DSharpPlus"
+        ]
     }
 }

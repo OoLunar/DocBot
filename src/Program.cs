@@ -1,14 +1,15 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Reflection;
 using System.Threading.Tasks;
 using DSharpPlus;
-using DSharpPlus.CommandAll;
-using DSharpPlus.CommandAll.Parsers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using OoLunar.DocBot.AssemblyProviders;
 using OoLunar.DocBot.Events;
 using Serilog;
 using Serilog.Events;
@@ -18,12 +19,10 @@ namespace OoLunar.DocBot
 {
     public sealed class Program
     {
-        private static readonly string[] _prefixes = new[] { ">>" };
-
         public static async Task Main(string[] args)
         {
             IServiceCollection services = new ServiceCollection();
-            services.AddSingleton(services => new ConfigurationBuilder()
+            services.AddSingleton<IConfiguration>(services => new ConfigurationBuilder()
                 .AddJsonFile("config.json", true, true)
 #if DEBUG
                 .AddJsonFile("config.debug.json", true, true)
@@ -78,46 +77,57 @@ namespace OoLunar.DocBot
             });
 
             Assembly currentAssembly = typeof(Program).Assembly;
-            services.AddSingleton((services) =>
+            services.AddSingleton((serviceProvider) =>
             {
-                DiscordEventManager eventManager = new(services);
+                DiscordEventManager eventManager = new(serviceProvider);
                 eventManager.GatherEventHandlers(currentAssembly);
                 return eventManager;
             });
 
-            services.AddSingleton(async services =>
+            services.AddSingleton(serviceProvider =>
             {
-                IConfiguration configuration = services.GetRequiredService<IConfiguration>();
-                DiscordEventManager eventManager = services.GetRequiredService<DiscordEventManager>();
+                IConfiguration configuration = serviceProvider.GetRequiredService<IConfiguration>();
+                DiscordEventManager eventManager = serviceProvider.GetRequiredService<DiscordEventManager>();
                 DiscordShardedClient shardedClient = new(new DiscordConfiguration()
                 {
                     Token = configuration.GetValue<string>("discord:token")!,
                     Intents = eventManager.Intents,
-                    LoggerFactory = services.GetRequiredService<ILoggerFactory>()
+                    LoggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>()
                 });
 
                 eventManager.RegisterEventHandlers(shardedClient);
-                IReadOnlyDictionary<int, CommandAllExtension> commandAllShards = await shardedClient.UseCommandAllAsync(new CommandAllConfiguration()
-                {
-#if DEBUG
-                    DebugGuildId = configuration.GetValue<ulong?>("discord:debug_guild_id"),
-#endif
-                    PrefixParser = new PrefixParser(configuration.GetSection("discord:prefixes").Get<string[]>() ?? _prefixes)
-                });
-
-                foreach (CommandAllExtension commandAll in commandAllShards.Values)
-                {
-                    commandAll.CommandManager.AddCommands(commandAll, currentAssembly);
-                    commandAll.ArgumentConverterManager.AddArgumentConverters(currentAssembly);
-                    eventManager.RegisterEventHandlers(commandAll);
-                }
-
                 return shardedClient;
             });
 
+            services.AddSingleton((serviceProvider) => new NugetAssemblyProvider(serviceProvider.GetRequiredService<IConfiguration>(), serviceProvider.GetRequiredService<ILogger<NugetAssemblyProvider>>()));
+            services.AddSingleton((serviceProvider) =>
+            {
+                ILogger<DocumentationProvider> logger = serviceProvider.GetRequiredService<ILogger<DocumentationProvider>>();
+                NugetAssemblyProvider assemblyProvider = serviceProvider.GetRequiredService<NugetAssemblyProvider>();
+                return new DocumentationProvider(assemblyProvider.GetAssembliesAsync, logger);
+            });
+
             IServiceProvider serviceProvider = services.BuildServiceProvider();
+            ILogger<Program> logger = serviceProvider.GetRequiredService<ILogger<Program>>();
+            IConfiguration configuration = serviceProvider.GetRequiredService<IConfiguration>();
+            DocumentationProvider documentationProvider = serviceProvider.GetRequiredService<DocumentationProvider>();
+            await documentationProvider.ReloadAsync();
+
             DiscordShardedClient discordShardedClient = serviceProvider.GetRequiredService<DiscordShardedClient>();
             await discordShardedClient.StartAsync();
+
+            // Register the documentation command
+            HttpRequestMessage request = new(HttpMethod.Put, $"https://discord.com/api/v10/applications/{discordShardedClient.CurrentApplication.Id}/commands") { Content = new StringContent("""[{"name":"documentation","description":"Sends documentation on the specified .NET member.","type":1,"default_member_permissions":"2048","dm_permission":true,"options":[{"type":3,"name":"member","description":"The member to get documentation for.","required":true,"autocomplete":true}]}]""", MediaTypeHeaderValue.Parse("application/json")) };
+            request.Headers.Add("Authorization", $"Bot {configuration.GetValue<string>("discord:token")}");
+            request.Headers.Add("User-Agent", "OoLunar.DocBot (github.com/OoLunar/DocBot, v0.1.0)");
+
+            HttpResponseMessage response = await new HttpClient().SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.LogError("Failed to register slash commands: {StatusCode} {ReasonPhrase} {Content}", (int)response.StatusCode, response.ReasonPhrase, await response.Content.ReadAsStringAsync());
+                return;
+            }
+
             await Task.Delay(-1);
         }
     }
