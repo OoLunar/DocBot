@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Text;
 using System.Threading.Tasks;
 using DSharpPlus;
 using DSharpPlus.Entities;
@@ -83,28 +84,50 @@ namespace OoLunar.DocBot
             DiscordEmbedBuilder baseEmbedBuilder = new() { Color = new DiscordColor(0x6b73db) };
             foreach (MemberInfo member in members)
             {
-                DiscordEmbedBuilder embedBuilder = new DiscordEmbedBuilder(baseEmbedBuilder)
-                    .WithTitle((member.DeclaringType is null ? $"<runtime generated>.{member.Name}" : $"{member.DeclaringType.FullName}.{member.Name}").TrimLength(256))
-                    .WithFooter($"{member.GetMemberType()}: {member.GetFullName()}\nDocumentation provided by {member.DeclaringType?.Assembly.GetName().Name}".TrimLength(2048));
-
-                string summary = member.GetXmlDocsSummary(_defaultXmlDocsOptions).TrimLength(4096);
-                string remarks = member.GetXmlDocsRemarks(_defaultXmlDocsOptions).TrimLength(1024);
-
-                // If the summary length and remarks length (and a newline) is less than or equal to 4096, then we can just append the remarks to the summary.
-                if (summary.Length + remarks.Length + 1 <= 4096)
+                StringBuilder stringBuilder = new("## ");
+                string summary = member.GetXmlDocsSummary(_defaultXmlDocsOptions);
+                string? remarks = member.GetXmlDocsRemarks(_defaultXmlDocsOptions);
+                if (string.IsNullOrWhiteSpace(summary))
                 {
-                    summary += "\n" + remarks;
+                    summary = "No summary provided.";
+                }
+
+                if (string.IsNullOrWhiteSpace(remarks))
+                {
+                    remarks = null;
+                }
+
+                Uri? source = null;
+                if (source is null)
+                {
+                    stringBuilder.Append(member.DeclaringType is null ? "<runtime generated>" : member.DeclaringType.FullName);
+                    stringBuilder.Append('.');
+                    stringBuilder.Append(member.Name);
                 }
                 else
                 {
-                    embedBuilder.AddField("Remarks", remarks);
+                    stringBuilder.Append('[');
+                    stringBuilder.Append(member.DeclaringType is null ? "<runtime generated>" : member.DeclaringType.FullName);
+                    stringBuilder.Append('.');
+                    stringBuilder.Append(member.Name);
+                    stringBuilder.Append("](");
+                    stringBuilder.Append(source);
+                    stringBuilder.Append(')');
                 }
 
-                embedBuilder.Description = summary;
-                embedBuilder.AddField("Declaration", Formatter.BlockCode(member.GetDeclarationSyntax().TrimLength(1024), "cs"), false);
-                embedBuilder.AddField("Source", "Unavailable", false);
+                stringBuilder.AppendLine();
+                stringBuilder.AppendLine("### Summary");
+                stringBuilder.AppendLine(summary);
+                if (remarks is not null)
+                {
+                    stringBuilder.AppendLine("### Remarks");
+                    stringBuilder.AppendLine(remarks);
+                }
 
-                yield return new DocumentationMember(Ulid.NewUlid(), member.GetFullName(), embedBuilder);
+                stringBuilder.AppendLine("### Declaration");
+                stringBuilder.AppendLine(Formatter.BlockCode(member.GetDeclarationSyntax(), "cs"));
+
+                yield return new DocumentationMember(Ulid.NewUlid(), member.GetFullName(), stringBuilder.ToString().TrimLength(2048));
             }
         }
     }

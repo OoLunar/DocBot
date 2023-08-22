@@ -48,7 +48,7 @@ namespace OoLunar.DocBot.Commands
             else
             {
                 _logger.LogDebug("Documentation found for: {Query}.", documentation.DisplayName);
-                return eventArgs.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().AddEmbed(documentation.EmbedBuilder));
+                return eventArgs.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent(documentation.Content));
             }
         }
     }
