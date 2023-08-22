@@ -473,7 +473,12 @@ namespace OoLunar.DocBot
             for (int i = 0; i < parameters.Length; i++)
             {
                 ParameterInfo parameter = parameters[i];
-                stringBuilder.Append(parameter.GetAttributeSyntax());
+                string attributeSyntax = parameter.GetAttributeSyntax();
+                if (!string.IsNullOrWhiteSpace(attributeSyntax))
+                {
+                    stringBuilder.Append(attributeSyntax);
+                    stringBuilder.Append(' ');
+                }
                 stringBuilder.Append(parameter.ParameterType.GetFullGenericTypeName());
                 stringBuilder.Append(' ');
                 stringBuilder.Append(parameter.Name);
