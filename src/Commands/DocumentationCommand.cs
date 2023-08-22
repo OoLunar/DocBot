@@ -42,12 +42,12 @@ namespace OoLunar.DocBot.Commands
             }
             else if (!_documentationProvider.Members.TryGetValue(id, out DocumentationMember? documentation))
             {
-                _logger.LogDebug("No documentation found for: {Query}.", query);
+                _logger.LogDebug("No documentation found for: {Id}.", id);
                 return eventArgs.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent("No documentation found."));
             }
             else
             {
-                _logger.LogDebug("Documentation found for: {Query}.", documentation.DisplayName);
+                _logger.LogDebug("Documentation found for {Id}: {Query}.", id, documentation.DisplayName);
                 return eventArgs.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent(documentation.Content));
             }
         }
