@@ -14,8 +14,8 @@
     },
     "nuget": {
         "path": "packages",
-        "packages": [
-            "DSharpPlus"
-        ]
+        "packages": {
+            "DSharpPlus": "4.4.2"
+        }
     }
 }
