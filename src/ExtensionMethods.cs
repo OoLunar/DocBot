@@ -368,7 +368,9 @@ namespace OoLunar.DocBot
             string[] names = enumType.GetEnumNames();
             if (names.Length != 0)
             {
-                stringBuilder.Append("\n{\n  ");
+                stringBuilder.Append('\n');
+                stringBuilder.Append("{\n");
+                stringBuilder.Append("  ");
 
                 Array values = enumType.GetEnumValues();
                 for (int i = 0; i < names.Length; i++)
@@ -450,7 +452,7 @@ namespace OoLunar.DocBot
                 {
                     // override <return type> <base type>.<base method>
                     // override void object.ToString
-                    stringBuilder.Append(" override ");
+                    stringBuilder.Append("override ");
                     stringBuilder.Append(methodInfo.ReturnType.GetFullGenericTypeName());
                     stringBuilder.Append(' ');
                     stringBuilder.Append(baseImplementation.DeclaringType!.GetFullGenericTypeName());
@@ -468,26 +470,35 @@ namespace OoLunar.DocBot
             }
 
             // Parameters
-            stringBuilder.Append('(');
             ParameterInfo[] parameters = methodBase.GetParameters();
-            for (int i = 0; i < parameters.Length; i++)
+            if (parameters.Length != 0)
             {
-                ParameterInfo parameter = parameters[i];
-                string attributeSyntax = parameter.GetAttributeSyntax();
-                if (!string.IsNullOrWhiteSpace(attributeSyntax))
+                stringBuilder.Append("\n(");
+                for (int i = 0; i < parameters.Length; i++)
                 {
-                    stringBuilder.Append(attributeSyntax);
+                    stringBuilder.Append("\n\t");
+
+                    ParameterInfo parameter = parameters[i];
+                    string attributeSyntax = parameter.GetAttributeSyntax();
+                    if (!string.IsNullOrWhiteSpace(attributeSyntax))
+                    {
+                        stringBuilder.Append(attributeSyntax);
+                        stringBuilder.Append(' ');
+                    }
+                    stringBuilder.Append(parameter.ParameterType.GetFullGenericTypeName());
                     stringBuilder.Append(' ');
+                    stringBuilder.Append(parameter.Name);
+                    if (i != parameters.Length - 1)
+                    {
+                        stringBuilder.Append(',');
+                    }
                 }
-                stringBuilder.Append(parameter.ParameterType.GetFullGenericTypeName());
-                stringBuilder.Append(' ');
-                stringBuilder.Append(parameter.Name);
-                if (i != parameters.Length - 1)
-                {
-                    stringBuilder.Append(", ");
-                }
+                stringBuilder.Append("\n);");
             }
-            stringBuilder.Append(");");
+            else
+            {
+                stringBuilder.Append("();");
+            }
 
             return stringBuilder.ToString();
         }
