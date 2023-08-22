@@ -37,14 +37,14 @@ namespace OoLunar.DocBot.Events.Handlers
             _logger.LogDebug("Querying documentation for: \"{Query}\"", query);
 
             List<DiscordAutoCompleteChoice> choices = new(10);
-            foreach (string choice in _documentationProvider.Members.Keys)
+            foreach (DocumentationMember member in _documentationProvider.Members.Values)
             {
-                if (!choice.StartsWith(query, StringComparison.OrdinalIgnoreCase) && !choice.Contains(query, StringComparison.OrdinalIgnoreCase))
+                if (!member.DisplayName.StartsWith(query, StringComparison.OrdinalIgnoreCase) && !member.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }
 
-                choices.Add(new DiscordAutoCompleteChoice(choice.TrimLength(100), choice.TrimLength(100)));
+                choices.Add(new DiscordAutoCompleteChoice(member.DisplayName.TrimLength(100), member.Id.ToString()));
                 if (choices.Count == 10)
                 {
                     break;

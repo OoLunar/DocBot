@@ -2,7 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using DSharpPlus;
@@ -21,7 +20,7 @@ namespace OoLunar.DocBot
             ResolveExternalXmlDocs = true
         };
 
-        public IReadOnlyDictionary<string, DiscordEmbedBuilder> Members { get; private set; }
+        public FrozenDictionary<Ulid, DocumentationMember> Members { get; private set; }
 
         private readonly AssemblyProviderAsync _assemblyProvider;
         private readonly ILogger<DocumentationProvider> _logger;
@@ -30,7 +29,7 @@ namespace OoLunar.DocBot
         {
             _logger = logger ?? NullLoggerFactory.Instance.CreateLogger<DocumentationProvider>();
             _assemblyProvider = assemblyProvider;
-            Members = new Dictionary<string, DiscordEmbedBuilder>().ToFrozenDictionary();
+            Members = new Dictionary<Ulid, DocumentationMember>().ToFrozenDictionary();
         }
 
         public async ValueTask ReloadAsync()
@@ -48,14 +47,14 @@ namespace OoLunar.DocBot
                 return;
             }
 
-            Dictionary<string, DiscordEmbedBuilder> members = new(StringComparer.Ordinal);
-            foreach ((string key, DiscordEmbedBuilder embedBuilder) in ParseMembers(GetMembers(assemblies)))
+            Dictionary<Ulid, DocumentationMember> members = new();
+            foreach (DocumentationMember member in ParseMembers(GetMembers(assemblies)))
             {
-                _logger.LogTrace("Loaded embed for {MemberName}.", embedBuilder.Title);
-                members[key] = embedBuilder;
+                _logger.LogTrace("Loaded: {MemberName}", member.DisplayName);
+                members[member.Id] = member;
             }
 
-            Members = members.OrderBy(pair => pair.Key).ToDictionary(pair => pair.Key, pair => pair.Value).AsReadOnly();
+            Members = members.ToFrozenDictionary();
             _logger.LogInformation("Reloaded documentation.");
             return;
         }
@@ -79,7 +78,7 @@ namespace OoLunar.DocBot
             return members;
         }
 
-        private static IEnumerable<(string, DiscordEmbedBuilder)> ParseMembers(IEnumerable<MemberInfo> members)
+        private static IEnumerable<DocumentationMember> ParseMembers(IEnumerable<MemberInfo> members)
         {
             DiscordEmbedBuilder baseEmbedBuilder = new() { Color = new DiscordColor(0x6b73db) };
             foreach (MemberInfo member in members)
@@ -105,7 +104,7 @@ namespace OoLunar.DocBot
                 embedBuilder.AddField("Declaration", Formatter.BlockCode(member.GetDeclarationSyntax().TrimLength(1024), "cs"), false);
                 embedBuilder.AddField("Source", "Unavailable", false);
 
-                yield return (member.GetFullName(), embedBuilder);
+                yield return new DocumentationMember(Ulid.NewUlid(), member.GetFullName(), embedBuilder);
             }
         }
     }

@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using DSharpPlus;
@@ -29,16 +30,26 @@ namespace OoLunar.DocBot.Commands
             }
 
             string query = eventArgs.Interaction.Data.Options.First().Value.ToString() ?? string.Empty;
-            _logger.LogDebug("Querying documentation for {Query}.", query);
-
-            if (!_documentationProvider.Members.TryGetValue(query, out DiscordEmbedBuilder? documentation))
+            if (string.IsNullOrWhiteSpace(query))
             {
-                _logger.LogDebug("No documentation found for {Query}.", query);
+                _logger.LogDebug("No query provided.");
+                return eventArgs.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent("No query provided."));
+            }
+            else if (!Ulid.TryParse(query, out Ulid id))
+            {
+                _logger.LogDebug("Invalid query provided: {Query}", query);
+                return eventArgs.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent("Invalid query provided."));
+            }
+            else if (!_documentationProvider.Members.TryGetValue(id, out DocumentationMember? documentation))
+            {
+                _logger.LogDebug("No documentation found for: {Query}.", query);
                 return eventArgs.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent("No documentation found."));
             }
-
-            _logger.LogDebug("Documentation found for {Query}.", query);
-            return eventArgs.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().AddEmbed(documentation));
+            else
+            {
+                _logger.LogDebug("Documentation found for: {Query}.", documentation.DisplayName);
+                return eventArgs.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().AddEmbed(documentation.EmbedBuilder));
+            }
         }
     }
 }
