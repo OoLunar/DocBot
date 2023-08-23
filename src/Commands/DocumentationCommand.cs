@@ -29,38 +29,54 @@ namespace OoLunar.DocBot.Commands
                 return;
             }
 
+            DocumentationMember? documentation = null;
             string query = eventArgs.Interaction.Data.Options.First().Value.ToString() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(query))
             {
                 _logger.LogDebug("No query provided.");
                 await eventArgs.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent("No query provided."));
             }
-            else if (!Ulid.TryParse(query, out Ulid id))
+            else if (!Ulid.TryParse(query, out Ulid id) || !_documentationProvider.Members.TryGetValue(id, out documentation))
             {
-                _logger.LogDebug("Invalid query provided: {Query}", query);
-                await eventArgs.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent("Invalid query provided."));
-            }
-            else if (!_documentationProvider.Members.TryGetValue(id, out DocumentationMember? documentation))
-            {
-                _logger.LogDebug("No documentation found for: {Id}.", id);
-                await eventArgs.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent("No documentation found."));
-            }
-            else
-            {
-                _logger.LogDebug("Documentation found for {Id}: {Query}.", id, documentation.DisplayName);
-                if (!documentation.SourceUri.IsValueCreated)
+                foreach (DocumentationMember member in _documentationProvider.Members.Values)
                 {
-                    Uri? source = await documentation.SourceUri.Value;
-                    if (source is not null)
+                    if (member.FullName.Equals(query, StringComparison.OrdinalIgnoreCase))
                     {
-                        string[] lines = documentation.Content.Split('\n');
-                        lines[0] = $"## [{lines[0][3..]}](<{source}>)";
-                        documentation.Content = string.Join('\n', lines);
+                        documentation = member;
+                        break;
+                    }
+                    else if (member.DisplayName.Equals(query, StringComparison.OrdinalIgnoreCase))
+                    {
+                        documentation = member;
+                        break;
+                    }
+                    else if (member.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase))
+                    {
+                        documentation = member;
                     }
                 }
-
-                await eventArgs.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent(documentation.Content));
             }
+
+            if (documentation is null)
+            {
+                _logger.LogDebug("No documentation found for: {Query}.", query);
+                await eventArgs.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent("No documentation found."));
+                return;
+            }
+
+            _logger.LogDebug("Documentation found for: {Query}.", documentation.DisplayName);
+            if (!documentation.SourceUri.IsValueCreated)
+            {
+                Uri? source = await documentation.SourceUri.Value;
+                if (source is not null)
+                {
+                    string[] lines = documentation.Content.Split('\n');
+                    lines[0] = $"## [{lines[0][3..]}](<{source}>)";
+                    documentation.Content = string.Join('\n', lines);
+                }
+            }
+
+            await eventArgs.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent(documentation.Content));
         }
     }
 }
