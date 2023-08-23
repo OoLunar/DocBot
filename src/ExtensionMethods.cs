@@ -488,6 +488,21 @@ namespace OoLunar.DocBot
                     stringBuilder.Append(parameter.ParameterType.GetFullGenericTypeName());
                     stringBuilder.Append(' ');
                     stringBuilder.Append(parameter.Name);
+
+                    if (parameter.HasDefaultValue)
+                    {
+                        stringBuilder.Append(" = ");
+                        stringBuilder.Append(parameter.DefaultValue switch
+                        {
+                            Enum @enum => $"{@enum.GetType().Name}.{@enum}",
+                            string @string => $"\"{@string}\"",
+                            char @char => $"'{@char}'",
+                            bool @bool => @bool ? "true" : "false",
+                            null => "null",
+                            _ => parameter.DefaultValue
+                        });
+                    }
+
                     if (i != parameters.Length - 1)
                     {
                         stringBuilder.Append(',');
