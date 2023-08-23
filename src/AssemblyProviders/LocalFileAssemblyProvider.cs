@@ -45,12 +45,12 @@ namespace OoLunar.DocBot.AssemblyProviders
 
         public ValueTask<IEnumerable<Assembly>> GetAssembliesAsync()
         {
-            DocumentationLoadContext loadContext = new("packages");
             List<Assembly> assemblies = new();
             foreach (string file in _assemblyPaths)
             {
                 try
                 {
+                    DocumentationLoadContext loadContext = new(Path.GetFullPath(file));
                     assemblies.Add(loadContext.LoadFromAssemblyPath(Path.GetFullPath(file)));
                 }
                 catch (Exception error)

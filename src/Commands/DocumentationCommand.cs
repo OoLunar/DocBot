@@ -36,7 +36,7 @@ namespace OoLunar.DocBot.Commands
                 _logger.LogDebug("No query provided.");
                 await eventArgs.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent("No query provided."));
             }
-            else if (!Ulid.TryParse(query, out Ulid id) || !_documentationProvider.Members.TryGetValue(id, out documentation))
+            else if (!int.TryParse(query, out int id) || !_documentationProvider.Members.TryGetValue(id, out documentation))
             {
                 foreach (DocumentationMember member in _documentationProvider.Members.Values)
                 {

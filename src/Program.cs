@@ -99,13 +99,26 @@ namespace OoLunar.DocBot
                 return shardedClient;
             });
 
+            services.AddSingleton((serviceProvider) =>
+            {
+                AssemblyInformationalVersionAttribute? assemblyInformationalVersion = typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
+                HttpClient httpClient = new();
+#if DEBUG
+                httpClient.DefaultRequestHeaders.Add("User-Agent", $"OoLunar.DocBot/{assemblyInformationalVersion?.InformationalVersion ?? "0.1.0"}-dev");
+#else
+                httpClient.DefaultRequestHeaders.Add("User-Agent", $"OoLunar.DocBot/{assemblyInformationalVersion?.InformationalVersion ?? "0.1.0"}");
+#endif
+                return httpClient;
+            });
+
+            services.AddSingleton<GitHubMetadataRetriever>();
             services.AddSingleton((serviceProvider) => new NugetAssemblyProvider(serviceProvider.GetRequiredService<IConfiguration>(), serviceProvider.GetRequiredService<ILogger<NugetAssemblyProvider>>()));
             services.AddSingleton((serviceProvider) =>
             {
-                IConfiguration configuration = serviceProvider.GetRequiredService<IConfiguration>();
-                ILogger<DocumentationProvider> logger = serviceProvider.GetRequiredService<ILogger<DocumentationProvider>>();
                 NugetAssemblyProvider assemblyProvider = serviceProvider.GetRequiredService<NugetAssemblyProvider>();
-                return new DocumentationProvider(configuration, assemblyProvider.GetAssembliesAsync, null, logger);
+                GitHubMetadataRetriever github = serviceProvider.GetRequiredService<GitHubMetadataRetriever>();
+                ILogger<DocumentationProvider> logger = serviceProvider.GetRequiredService<ILogger<DocumentationProvider>>();
+                return new DocumentationProvider(assemblyProvider.GetAssembliesAsync, github, logger);
             });
 
             IServiceProvider serviceProvider = services.BuildServiceProvider();

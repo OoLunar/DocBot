@@ -44,7 +44,7 @@ namespace OoLunar.DocBot.Events.Handlers
                     continue;
                 }
 
-                choices.Add(new DiscordAutoCompleteChoice(member.DisplayName.TrimLength(100), member.Id.ToString()));
+                choices.Add(new DiscordAutoCompleteChoice(member.DisplayName.TrimLength(100), member.GetHashCode().ToString()));
                 if (choices.Count == 10)
                 {
                     break;
