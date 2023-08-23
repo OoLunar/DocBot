@@ -102,9 +102,10 @@ namespace OoLunar.DocBot
             services.AddSingleton((serviceProvider) => new NugetAssemblyProvider(serviceProvider.GetRequiredService<IConfiguration>(), serviceProvider.GetRequiredService<ILogger<NugetAssemblyProvider>>()));
             services.AddSingleton((serviceProvider) =>
             {
+                IConfiguration configuration = serviceProvider.GetRequiredService<IConfiguration>();
                 ILogger<DocumentationProvider> logger = serviceProvider.GetRequiredService<ILogger<DocumentationProvider>>();
                 NugetAssemblyProvider assemblyProvider = serviceProvider.GetRequiredService<NugetAssemblyProvider>();
-                return new DocumentationProvider(assemblyProvider.GetAssembliesAsync, logger);
+                return new DocumentationProvider(configuration, assemblyProvider.GetAssembliesAsync, null, logger);
             });
 
             IServiceProvider serviceProvider = services.BuildServiceProvider();
