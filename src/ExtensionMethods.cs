@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.CSharp;
 
@@ -12,6 +13,10 @@ namespace OoLunar.DocBot
     public static class ExtensionMethods
     {
         private static readonly CSharpCodeProvider _codeDom = new();
+        private static readonly string[] _ignoreAttributes = new[] {
+            typeof(OptionalAttribute).GetFullGenericTypeName(),
+            typeof(NullableAttribute).GetFullGenericTypeName()
+        };
 
         public static string TrimLength(this string value, int length) => value.Length > length ? $"{value[..(length - 1)].Trim()}…" : value;
 
@@ -99,6 +104,7 @@ namespace OoLunar.DocBot
 
         public static string GetAttributeSyntax(IList<CustomAttributeData> attributes)
         {
+            attributes = attributes.Where(attribute => !_ignoreAttributes.Contains(attribute.AttributeType.GetFullGenericTypeName())).ToList();
             StringBuilder stringBuilder = new();
             for (int i = 0; i < attributes.Count; i++)
             {
@@ -623,7 +629,15 @@ namespace OoLunar.DocBot
             if (propertyInfo.GetCustomAttribute<DefaultValueAttribute>() is DefaultValueAttribute defaultValueAttribute)
             {
                 stringBuilder.Append(" = ");
-                stringBuilder.Append(defaultValueAttribute.Value);
+                stringBuilder.Append(defaultValueAttribute.Value switch
+                {
+                    Enum @enum => $"{@enum.GetType().Name}.{@enum}",
+                    string @string => $"\"{@string}\"",
+                    char @char => $"'{@char}'",
+                    bool @bool => @bool ? "true" : "false",
+                    null => "null",
+                    _ => defaultValueAttribute.Value
+                });
                 stringBuilder.Append(';');
             }
 
