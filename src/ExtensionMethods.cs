@@ -137,7 +137,16 @@ namespace OoLunar.DocBot
                     for (int j = 0; j < attribute.ConstructorArguments.Count; j++)
                     {
                         CustomAttributeTypedArgument argument = attribute.ConstructorArguments[j];
-                        stringBuilder.Append(argument.Value);
+                        stringBuilder.Append(argument.Value switch
+                        {
+                            Enum @enum => $"{@enum.GetType().Name}.{@enum}",
+                            string @string => $"\"{@string}\"",
+                            char @char => $"'{@char}'",
+                            bool @bool => @bool ? "true" : "false",
+                            null => "null",
+                            _ => argument.Value
+                        });
+
                         if (j != attribute.ConstructorArguments.Count - 1)
                         {
                             stringBuilder.Append(", ");
@@ -149,7 +158,16 @@ namespace OoLunar.DocBot
                         CustomAttributeNamedArgument argument = attribute.NamedArguments[j];
                         stringBuilder.Append(argument.MemberName);
                         stringBuilder.Append(" = ");
-                        stringBuilder.Append(argument.TypedValue.Value);
+                        stringBuilder.Append(argument.TypedValue.Value switch
+                        {
+                            Enum @enum => $"{@enum.GetType().Name}.{@enum}",
+                            string @string => $"\"{@string}\"",
+                            char @char => $"'{@char}'",
+                            bool @bool => @bool ? "true" : "false",
+                            null => "null",
+                            _ => argument.TypedValue.Value
+                        });
+
                         if (j != attribute.NamedArguments.Count - 1)
                         {
                             stringBuilder.Append(", ");
