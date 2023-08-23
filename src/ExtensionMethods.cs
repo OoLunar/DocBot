@@ -15,7 +15,8 @@ namespace OoLunar.DocBot
         private static readonly CSharpCodeProvider _codeDom = new();
         private static readonly string[] _ignoreAttributes = new[] {
             typeof(OptionalAttribute).GetFullGenericTypeName(),
-            typeof(NullableAttribute).GetFullGenericTypeName()
+            typeof(NullableAttribute).GetFullGenericTypeName(),
+            typeof(ExtensionAttribute).GetFullGenericTypeName()
         };
 
         public static string TrimLength(this string value, int length) => value.Length > length ? $"{value[..(length - 1)].Trim()}…" : value;
@@ -509,6 +510,12 @@ namespace OoLunar.DocBot
                         stringBuilder.Append(attributeSyntax);
                         stringBuilder.Append(' ');
                     }
+
+                    if (i == 0 && methodBase.GetCustomAttribute<ExtensionAttribute>() is not null)
+                    {
+                        stringBuilder.Append("this ");
+                    }
+
                     stringBuilder.Append(parameter.ParameterType.GetFullGenericTypeName());
                     stringBuilder.Append(' ');
                     stringBuilder.Append(parameter.Name);
