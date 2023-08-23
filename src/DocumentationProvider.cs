@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Reflection;
@@ -173,7 +174,7 @@ namespace OoLunar.DocBot
                 }
 
                 Parallel.ForEach(assembly.GetExportedTypes(), type =>
-                    Parallel.ForEach(type.GetMembers(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly), member =>
+                    Parallel.ForEach(type.GetMembers(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly).Append(type), member =>
                     {
                         if (member.TryGetPropertyValue("IsSpecialName", false))
                         {
@@ -192,10 +193,23 @@ namespace OoLunar.DocBot
                             remarks = null;
                         }
 
+                        string? name = null;
+                        if (member.DeclaringType is null)
+                        {
+                            if (member is Type memberType)
+                            {
+                                name = memberType.FullName;
+                            }
+
+                            name ??= member.Name;
+                        }
+                        else
+                        {
+                            name = $"{member.DeclaringType.FullName}.{member.Name}";
+                        }
+
                         StringBuilder stringBuilder = new("## ");
-                        stringBuilder.Append(member.DeclaringType is null ? "<runtime generated>" : member.DeclaringType.FullName);
-                        stringBuilder.Append('.');
-                        stringBuilder.Append(member.Name);
+                        stringBuilder.Append(name);
                         stringBuilder.AppendLine();
                         stringBuilder.AppendLine("### Summary");
                         stringBuilder.AppendLine(summary);
@@ -208,7 +222,11 @@ namespace OoLunar.DocBot
                         stringBuilder.AppendLine("### Declaration");
                         stringBuilder.AppendLine(Formatter.BlockCode(member.GetDeclarationSyntax(), "cs"));
 
-                        members.Enqueue(new DocumentationMember(Ulid.NewUlid(), member.GetFullName(), stringBuilder.ToString().TrimLength(2048), new Lazy<Task<Uri?>>(() => FetchGitHubUrlAsync(member, apiUrl, sourceUrl), false)));
+                        members.Enqueue(new DocumentationMember(Ulid.NewUlid(),
+                            name,
+                            member.GetFullName(),
+                            stringBuilder.ToString().TrimLength(2048),
+                            new Lazy<Task<Uri?>>(() => FetchGitHubUrlAsync(member, apiUrl, sourceUrl), false)));
                     }));
             });
             return members;
