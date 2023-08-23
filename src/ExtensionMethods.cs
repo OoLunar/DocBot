@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -404,7 +405,7 @@ namespace OoLunar.DocBot
                     object value = values.GetValue(i)!;
                     stringBuilder.Append(name);
                     stringBuilder.Append(" = ");
-                    stringBuilder.Append(value);
+                    stringBuilder.Append(Convert.ChangeType(value, enumType.GetEnumUnderlyingType(), CultureInfo.InvariantCulture));
                     if (i != names.Length - 1)
                     {
                         stringBuilder.Append(",\n  ");
