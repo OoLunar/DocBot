@@ -1,137 +1,136 @@
-using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Threading;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using NuGet.Configuration;
-using NuGet.Frameworks;
-using NuGet.Packaging;
-using NuGet.Packaging.Core;
-using NuGet.Packaging.Signing;
-using NuGet.Protocol.Core.Types;
-using NuGet.Resolver;
-using NuGet.Versioning;
-using NugetNullLogger = NuGet.Common.NullLogger;
 
 namespace OoLunar.DocBot.AssemblyProviders
 {
     public sealed class NugetAssemblyProvider
     {
+        private static readonly string _framework = "net8.0";
+        private static readonly string _csproj = $"""
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <SuppressNETCoreSdkPreviewMessage>true</SuppressNETCoreSdkPreviewMessage>
+    <TargetFramework>{_framework}</TargetFramework>
+  </PropertyGroup>
+</Project>
+""";
+
         private readonly IConfiguration _configuration;
         private readonly ILogger<NugetAssemblyProvider> _logger;
-        private readonly ISettings _settings;
-        private readonly SourceRepositoryProvider _sourceRepositoryProvider;
-        private readonly NuGetFramework _targettedFramework;
 
         public NugetAssemblyProvider(IConfiguration configuration, ILogger<NugetAssemblyProvider>? logger = null)
         {
-            ArgumentNullException.ThrowIfNull(configuration);
-
             _configuration = configuration;
             _logger = logger ?? NullLoggerFactory.Instance.CreateLogger<NugetAssemblyProvider>();
-            _settings = Settings.LoadDefaultSettings(null);
-            _sourceRepositoryProvider = new(new PackageSourceProvider(_settings), Repository.Provider.GetCoreV3());
-            _targettedFramework = NuGetFramework.ParseFolder("net8.0");
         }
 
         public async ValueTask<IEnumerable<Assembly>> GetAssembliesAsync()
         {
-            Dictionary<string, NuGetVersion> requestedAssemblies = _configuration.GetSection("nuget:packages").GetChildren().ToDictionary(section => section.Key, section => NuGetVersion.Parse(section.Value!));
-            if (requestedAssemblies.Count == 0)
+            string assemblyPath = Path.GetFullPath(_configuration.GetValue("nuget:path", "packages")!);
+
+#if DEBUG
+            if (Directory.Exists(assemblyPath))
             {
-                _logger.LogWarning("No packages specified in configuration");
+                Directory.Delete(assemblyPath, true);
+            }
+#endif
+
+            Directory.CreateDirectory(assemblyPath);
+            File.WriteAllText(Path.Combine(assemblyPath, "OoLunar.DocBot.csproj"), _csproj);
+
+            List<string> assemblies = new();
+            Dictionary<string, string?>? packages = _configuration.GetSection("nuget:packages")?.GetChildren()?.ToDictionary(x => x.Key, x => x.Value);
+            if (packages is null)
+            {
+                _logger.LogWarning("No packages were specified.");
                 return Enumerable.Empty<Assembly>();
             }
 
-            using SourceCacheContext cacheContext = new();
-            HashSet<SourcePackageDependencyInfo> availablePackages = new(PackageIdentityComparer.Default);
-            foreach (KeyValuePair<string, NuGetVersion> requestedAssembly in requestedAssemblies)
+            foreach ((string packageId, string? packageVersion) in packages)
             {
-                await GetPackageDependenciesAsync(new PackageIdentity(requestedAssembly.Key, requestedAssembly.Value), _targettedFramework, cacheContext, _sourceRepositoryProvider.GetRepositories(), availablePackages);
+                await AddPackageReferenceAsync(assemblyPath, _configuration.GetSection("nuget:sources").Get<string[]>(), packageId, packageVersion);
             }
 
-            // I'm not going to pretend like I know what's going on here.
-            // Checkout https://martinbjorkstrom.com/posts/2018-09-19-revisiting-nuget-client-libraries
-            PackageResolver resolver = new();
-            FrameworkReducer frameworkReducer = new();
-            PackagePathResolver packagePathResolver = new(Path.GetFullPath(_configuration.GetValue("nuget:path", "packages")!));
-            PackageResolverContext resolverContext = new(DependencyBehavior.Highest, requestedAssemblies.Keys, Enumerable.Empty<string>(), Enumerable.Empty<PackageReference>(), Enumerable.Empty<PackageIdentity>(), availablePackages, _sourceRepositoryProvider.GetRepositories().Select(s => s.PackageSource), NugetNullLogger.Instance);
-            PackageExtractionContext packageExtractionContext = new(PackageSaveMode.Defaultv3, XmlDocFileSaveMode.None, ClientPolicyContext.GetClientPolicy(_settings, NugetNullLogger.Instance), NugetNullLogger.Instance) { CopySatelliteFiles = false };
-            foreach (SourcePackageDependencyInfo? packageToInstall in resolver.Resolve(resolverContext, CancellationToken.None)
-                                                                              .Select(p => availablePackages.Single(x => PackageIdentityComparer.Default.Equals(x, p))))
+            ProcessStartInfo startInfo = new()
             {
-                PackageReaderBase packageReader;
-                string installedPath = packagePathResolver.GetInstalledPath(packageToInstall);
-                if (installedPath == null)
-                {
-                    DownloadResource downloadResource = await packageToInstall.Source.GetResourceAsync<DownloadResource>(CancellationToken.None);
-                    DownloadResourceResult downloadResult = await downloadResource.GetDownloadResourceResultAsync(packageToInstall, new PackageDownloadContext(cacheContext), SettingsUtility.GetGlobalPackagesFolder(_settings), NugetNullLogger.Instance, CancellationToken.None);
-                    await PackageExtractor.ExtractPackageAsync(downloadResult.PackageSource, downloadResult.PackageStream, packagePathResolver, packageExtractionContext, CancellationToken.None);
-                    packageReader = downloadResult.PackageReader;
-                }
-                else
-                {
-                    packageReader = new PackageFolderReader(installedPath);
-                }
-
-                IEnumerable<FrameworkSpecificGroup> libItems = packageReader.GetLibItems();
-                NuGetFramework? nearest = frameworkReducer.GetNearest(_targettedFramework, libItems.Select(x => x.TargetFramework));
-                IEnumerable<FrameworkSpecificGroup> frameworkItems = packageReader.GetFrameworkItems();
-                nearest = frameworkReducer.GetNearest(_targettedFramework, frameworkItems.Select(x => x.TargetFramework));
+                FileName = "dotnet",
+                Arguments = $"publish {Path.Combine(assemblyPath, "OoLunar.DocBot.csproj")} --framework {_framework}",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            };
+            Process process = Process.Start(startInfo)!;
+            await process.WaitForExitAsync();
+            if (process.ExitCode != 0)
+            {
+                _logger.LogError("Failed to restore packages.");
+                _logger.LogError("{Error}", process.StandardError.ReadToEnd());
+                return Enumerable.Empty<Assembly>();
             }
 
-            List<string> assemblyPaths = new();
-            string packagePath = Path.GetFullPath(_configuration.GetValue("nuget:path", "packages")!);
-            foreach (string file in Directory.EnumerateFiles(packagePath, "*", new EnumerationOptions { RecurseSubdirectories = true }))
+            foreach (string file in Directory.EnumerateFiles(Path.Combine(assemblyPath, $"bin/Release/{_framework}/publish/"), "*.dll"))
             {
-                string fileExtension = Path.GetExtension(file);
-                if (fileExtension == ".dll" && fileExtension == ".xml")
+                if (packages.ContainsKey(Path.GetFileNameWithoutExtension(file)))
                 {
-                    string fileName = Path.GetFileName(file);
-                    File.Move(file, Path.Combine(packagePath, Path.GetFileName(file)));
-                    if (requestedAssemblies.Keys.Any(x => $"{x}.dll" == fileName))
-                    {
-                        assemblyPaths.Add(Path.Combine(packagePath, fileName));
-                    }
+                    assemblies.Add(file);
                 }
             }
 
-            //foreach (string directory in Directory.EnumerateDirectories(packagePath))
-            //{
-            //    Directory.Delete(directory, true);
-            //}
-
-            return assemblyPaths.Count == 0
-                ? Enumerable.Empty<Assembly>()
-                : await new LocalFileAssemblyProvider(assemblyPaths).GetAssembliesAsync();
+            return await new LocalFileAssemblyProvider(assemblies, null).GetAssembliesAsync();
         }
 
-        private static async Task GetPackageDependenciesAsync(PackageIdentity package, NuGetFramework framework, SourceCacheContext cacheContext, IEnumerable<SourceRepository> repositories, ISet<SourcePackageDependencyInfo> availablePackages)
+        public async ValueTask AddPackageReferenceAsync(string dir, IEnumerable<string>? sources, string packageId, string? packageVersion = null)
         {
-            if (availablePackages.Contains(package))
+            StringBuilder arguments = new();
+            arguments.Append("add ");
+            arguments.Append(dir);
+            arguments.Append(" package ");
+            arguments.Append(packageId);
+            arguments.Append(' ');
+            if (packageVersion is not null)
             {
-                return;
+                arguments.Append("--version ");
+                arguments.Append(packageVersion);
+                arguments.Append(' ');
             }
 
-            foreach (SourceRepository sourceRepository in repositories)
+            arguments.Append("--framework ");
+            arguments.Append(_framework);
+            arguments.Append(' ');
+            if (sources is not null)
             {
-                DependencyInfoResource dependencyInfoResource = await sourceRepository.GetResourceAsync<DependencyInfoResource>();
-                SourcePackageDependencyInfo dependencyInfo = await dependencyInfoResource.ResolvePackage(package, framework, cacheContext, NugetNullLogger.Instance, CancellationToken.None);
-                if (dependencyInfo == null)
+                foreach (string source in sources)
                 {
-                    continue;
+                    arguments.Append("--source ");
+                    arguments.Append(source);
+                    arguments.Append(' ');
                 }
+            }
 
-                availablePackages.Add(dependencyInfo);
-                foreach (PackageDependency? dependency in dependencyInfo.Dependencies)
-                {
-                    await GetPackageDependenciesAsync(new PackageIdentity(dependency.Id, dependency.VersionRange.MinVersion), framework, cacheContext, repositories, availablePackages);
-                }
+            ProcessStartInfo startInfo = new()
+            {
+                FileName = "dotnet",
+                Arguments = arguments.ToString(),
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+            };
+
+            Process process = Process.Start(startInfo)!;
+            await process.WaitForExitAsync();
+            if (process.ExitCode != 0)
+            {
+                _logger.LogError("Failed to add package {PackageId} to {Directory}.", packageId, dir);
+                _logger.LogError("{Error}", process.StandardError.ReadToEnd());
             }
         }
     }
