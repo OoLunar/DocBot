@@ -26,7 +26,7 @@ namespace OoLunar.DocBot
 
         public async ValueTask<string?> MatchTagToReleaseAsync(string repository, string tagName)
         {
-            JsonDocument? release = await _httpClient.GetFromJsonAsync<JsonDocument>($"https://api.github.com/repos/{repository}/releases/latest");
+            JsonDocument? release = await _httpClient.GetFromJsonAsync<JsonDocument>($"https://api.github.com/repos/{repository}/releases");
             if (release is null)
             {
                 _logger.LogError("Failed to get latest release for {Repository}", repository);
@@ -134,7 +134,14 @@ namespace OoLunar.DocBot
 
             using HttpRequestMessage request = new(HttpMethod.Get, apiUrl);
             request.Headers.Add("Authorization", $"Bearer {githubToken}");
-            JsonDocument? jsonDocument = await _httpClient.GetFromJsonAsync<JsonDocument>(apiUrl);
+            using HttpResponseMessage response = await _httpClient.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogError("Failed to get GitHub URL for member: {MemberName}", memberInfo.GetFullName());
+                return null;
+            }
+
+            JsonDocument? jsonDocument = await response.Content.ReadFromJsonAsync<JsonDocument>();
             if (jsonDocument is null)
             {
                 _logger.LogError("Failed to parse JSON response from GitHub API for member: {MemberName}", memberInfo.GetFullName());
