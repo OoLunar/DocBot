@@ -15,9 +15,10 @@ namespace OoLunar.DocBot
     {
         private static readonly CSharpCodeProvider _codeDom = new();
         private static readonly string[] _ignoreAttributes = new[] {
-            typeof(OptionalAttribute).GetFullGenericTypeName(),
+            typeof(ExtensionAttribute).GetFullGenericTypeName(),
             typeof(NullableAttribute).GetFullGenericTypeName(),
-            typeof(ExtensionAttribute).GetFullGenericTypeName()
+            typeof(NullableContextAttribute).GetFullGenericTypeName(),
+            typeof(OptionalAttribute).GetFullGenericTypeName()
         };
 
         public static string TrimLength(this string value, int length) => value.Length > length ? $"{value[..(length - 1)].Trim()}…" : value;
