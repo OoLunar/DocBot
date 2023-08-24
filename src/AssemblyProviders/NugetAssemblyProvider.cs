@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -35,54 +36,53 @@ namespace OoLunar.DocBot.AssemblyProviders
 
         public async ValueTask<IEnumerable<Assembly>> GetAssembliesAsync()
         {
-            string assemblyPath = Path.GetFullPath(_configuration.GetValue("nuget:path", "packages")!);
-
-#if DEBUG
-            if (Directory.Exists(assemblyPath))
-            {
-                Directory.Delete(assemblyPath, true);
-            }
-#endif
-
-            Directory.CreateDirectory(assemblyPath);
-            File.WriteAllText(Path.Combine(assemblyPath, "OoLunar.DocBot.csproj"), _csproj);
-
-            List<string> assemblies = new();
             Dictionary<string, string?>? packages = _configuration.GetSection("nuget:packages")?.GetChildren()?.ToDictionary(x => x.Key, x => x.Value);
-            if (packages is null)
+            if (packages is null || packages.Count == 0)
             {
                 _logger.LogWarning("No packages were specified.");
                 return Enumerable.Empty<Assembly>();
             }
 
-            foreach ((string packageId, string? packageVersion) in packages)
+            string assemblyPath = Path.GetFullPath(_configuration.GetValue("nuget:path", "packages")!);
+            IReadOnlyList<string> assemblies = GetRequestedAssemblies(assemblyPath, packages.Keys);
+            if (assemblies.Count != packages.Count)
             {
-                await AddPackageReferenceAsync(assemblyPath, _configuration.GetSection("nuget:sources").Get<string[]>(), packageId, packageVersion);
-            }
-
-            ProcessStartInfo startInfo = new()
-            {
-                FileName = "dotnet",
-                Arguments = $"publish {Path.Combine(assemblyPath, "OoLunar.DocBot.csproj")} --framework {_framework}",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-            };
-            Process process = Process.Start(startInfo)!;
-            await process.WaitForExitAsync();
-            if (process.ExitCode != 0)
-            {
-                _logger.LogError("Failed to restore packages.");
-                _logger.LogError("{Error}", process.StandardError.ReadToEnd());
-                return Enumerable.Empty<Assembly>();
-            }
-
-            foreach (string file in Directory.EnumerateFiles(Path.Combine(assemblyPath, $"bin/Release/{_framework}/publish/"), "*.dll"))
-            {
-                if (packages.ContainsKey(Path.GetFileNameWithoutExtension(file)))
+                if (Directory.Exists(assemblyPath))
                 {
-                    assemblies.Add(file);
+                    Directory.Delete(assemblyPath, true);
                 }
+
+                _logger.LogInformation("Restoring packages...");
+                Directory.CreateDirectory(assemblyPath);
+                File.WriteAllText(Path.Combine(assemblyPath, "OoLunar.DocBot.csproj"), _csproj);
+
+                foreach ((string packageId, string? packageVersion) in packages)
+                {
+                    _logger.LogDebug("Restoring {PackageId}...", packageId);
+                    await AddPackageReferenceAsync(assemblyPath, null, packageId, packageVersion);
+                    _logger.LogInformation("Restored {PackageId}.", packageId);
+                }
+
+                ProcessStartInfo startInfo = new()
+                {
+                    FileName = "dotnet",
+                    Arguments = $"publish {Path.Combine(assemblyPath, "OoLunar.DocBot.csproj")} --framework {_framework}",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                };
+
+                Process process = Process.Start(startInfo)!;
+                await process.WaitForExitAsync();
+                if (process.ExitCode != 0)
+                {
+                    _logger.LogError("Failed to restore packages.");
+                    _logger.LogError("{Error}", process.StandardError.ReadToEnd());
+                    return Enumerable.Empty<Assembly>();
+                }
+
+                _logger.LogInformation("Restored packages.");
+                assemblies = GetRequestedAssemblies(assemblyPath, packages.Keys);
             }
 
             return await new LocalFileAssemblyProvider(assemblies, null).GetAssembliesAsync();
@@ -132,6 +132,26 @@ namespace OoLunar.DocBot.AssemblyProviders
                 _logger.LogError("Failed to add package {PackageId} to {Directory}.", packageId, dir);
                 _logger.LogError("{Error}", process.StandardError.ReadToEnd());
             }
+        }
+
+        public static IReadOnlyList<string> GetRequestedAssemblies(string assemblyPath, IEnumerable<string> packages)
+        {
+            string path = Path.Combine(assemblyPath, $"bin/Release/{_framework}/publish/");
+            if (!Directory.Exists(path))
+            {
+                return new List<string>();
+            }
+
+            List<string> assemblies = new();
+            foreach (string file in Directory.EnumerateFiles(path, "*.dll"))
+            {
+                if (packages.Any(package => package.Equals(Path.GetFileNameWithoutExtension(file), StringComparison.OrdinalIgnoreCase)))
+                {
+                    assemblies.Add(file);
+                }
+            }
+
+            return assemblies;
         }
     }
 }
