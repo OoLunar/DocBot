@@ -279,7 +279,7 @@ namespace OoLunar.DocBot
 
             // Base type or interfaces
             Type[] interfaces = type.GetInterfaces();
-            if (type.BaseType is not null || interfaces.Length != 0)
+            if ((type.BaseType is not null && type.BaseType != typeof(object) && type.BaseType != typeof(ValueType)) || interfaces.Length != 0)
             {
                 stringBuilder.Append(" : ");
                 if (type.BaseType is not null)
