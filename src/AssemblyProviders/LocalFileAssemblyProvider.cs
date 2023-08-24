@@ -12,7 +12,7 @@ namespace OoLunar.DocBot.AssemblyProviders
     public sealed class LocalFileAssemblyProvider
     {
         private readonly ILogger<LocalFileAssemblyProvider> _logger;
-        private readonly string[] _assemblyPaths;
+        private readonly IReadOnlyList<string> _assemblyPaths;
 
         public LocalFileAssemblyProvider(ILogger<LocalFileAssemblyProvider>? logger = null)
         {
@@ -20,13 +20,13 @@ namespace OoLunar.DocBot.AssemblyProviders
             _assemblyPaths = Directory.EnumerateFiles(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!, "*.dll").ToArray();
         }
 
-        public LocalFileAssemblyProvider(string[] assemblyPaths, ILogger<LocalFileAssemblyProvider>? logger = null)
+        public LocalFileAssemblyProvider(IReadOnlyList<string> assemblyPaths, ILogger<LocalFileAssemblyProvider>? logger = null)
         {
             if (assemblyPaths is null)
             {
                 throw new ArgumentNullException(nameof(assemblyPaths));
             }
-            else if (assemblyPaths.Length == 0)
+            else if (assemblyPaths.Count == 0)
             {
                 throw new ArgumentException("Assembly paths cannot be empty.", nameof(assemblyPaths));
             }
