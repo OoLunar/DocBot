@@ -51,8 +51,7 @@ namespace OoLunar.DocBot.Events.Handlers
                 }
             }
 
-            return eventArgs.Interaction.CreateResponseAsync(InteractionResponseType.AutoCompleteResult,
-                new DiscordInteractionResponseBuilder().AddAutoCompleteChoices(choices));
+            return eventArgs.Interaction.CreateResponseAsync(InteractionResponseType.AutoCompleteResult, new DiscordInteractionResponseBuilder().AddAutoCompleteChoices(choices.OrderByDescending(choice => choice.Name == query).ThenByDescending(choice => choice.Name.StartsWith(query)).ThenByDescending(choice => query.EndsWith(choice.Name)).ThenBy(choice => choice.Name.Length)));
         }
     }
 }
