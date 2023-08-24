@@ -11,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OoLunar.DocBot.AssemblyProviders;
 using OoLunar.DocBot.Events;
+using OoLunar.DocBot.GitHub;
 using Serilog;
 using Serilog.Events;
 using Serilog.Sinks.SystemConsole.Themes;
@@ -101,8 +102,9 @@ namespace OoLunar.DocBot
 
             services.AddSingleton((serviceProvider) =>
             {
+                ILogger<GitHubRateLimitMessageHandler> logger = serviceProvider.GetRequiredService<ILogger<GitHubRateLimitMessageHandler>>();
                 AssemblyInformationalVersionAttribute? assemblyInformationalVersion = typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
-                HttpClient httpClient = new();
+                HttpClient httpClient = new(new GitHubRateLimitMessageHandler(new HttpClientHandler(), logger));
 #if DEBUG
                 httpClient.DefaultRequestHeaders.Add("User-Agent", $"OoLunar.DocBot/{assemblyInformationalVersion?.InformationalVersion ?? "0.1.0"}-dev");
 #else

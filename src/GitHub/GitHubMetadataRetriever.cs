@@ -9,7 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
-namespace OoLunar.DocBot
+namespace OoLunar.DocBot.GitHub
 {
     public sealed class GitHubMetadataRetriever
     {
@@ -43,7 +43,7 @@ namespace OoLunar.DocBot
                 string? commit = jsonElement.GetProperty("tag_name").GetString();
                 if (commit is not null && commit.EndsWith(tagName, StringComparison.Ordinal))
                 {
-                    _logger.LogDebug("Got latest release {Release} for {Repository}", release, repository);
+                    _logger.LogDebug("Got latest release {Release} for {Repository}", commit, repository);
                     return commit;
                 }
             }

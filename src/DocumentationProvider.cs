@@ -10,6 +10,7 @@ using DSharpPlus;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Namotion.Reflection;
+using OoLunar.DocBot.GitHub;
 
 namespace OoLunar.DocBot
 {
