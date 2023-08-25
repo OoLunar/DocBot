@@ -65,18 +65,22 @@ namespace OoLunar.DocBot.Commands
             }
 
             _logger.LogDebug("Documentation found for: {Query}.", documentation.DisplayName);
-            if (!documentation.SourceUri.IsValueCreated)
+            if (documentation.SourceUri.IsValueCreated)
             {
-                Uri? source = await documentation.SourceUri.Value;
-                if (source is not null)
-                {
-                    string[] lines = documentation.Content.Split('\n');
-                    lines[0] = $"## [{lines[0][3..]}](<{source}>)";
-                    documentation.Content = string.Join('\n', lines);
-                }
+                await eventArgs.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent(documentation.Content));
+                return;
             }
 
-            await eventArgs.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent(documentation.Content));
+            // Defer
+            await eventArgs.Interaction.CreateResponseAsync(InteractionResponseType.DeferredChannelMessageWithSource);
+            Uri? source = await documentation.SourceUri.Value;
+            if (source is not null)
+            {
+                string[] lines = documentation.Content.Split('\n');
+                lines[0] = $"## [{lines[0][3..]}](<{source}>)";
+                documentation.Content = string.Join('\n', lines);
+            }
+            await eventArgs.Interaction.EditOriginalResponseAsync(new DiscordWebhookBuilder().WithContent(documentation.Content));
         }
     }
 }
