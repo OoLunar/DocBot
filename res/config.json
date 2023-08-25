@@ -15,7 +15,9 @@
     "nuget": {
         "path": "packages",
         "packages": {
-            "DSharpPlus": "4.4.2"
+            "DSharpPlus": "",
+            "OoLunar.HyperSharp": "",
+            "Microsoft.Extensions.DependencyInjection": ""
         }
     }
 }

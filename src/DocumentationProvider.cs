@@ -4,6 +4,7 @@ using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using DSharpPlus;
@@ -73,7 +74,7 @@ namespace OoLunar.DocBot
                 Parallel.ForEach(assembly.GetExportedTypes(), type =>
                     Parallel.ForEach(type.GetMembers(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly).Append(type), member =>
                     {
-                        if (member.TryGetPropertyValue("IsSpecialName", false))
+                        if (member.TryGetPropertyValue("IsSpecialName", false) || member.GetCustomAttribute<CompilerGeneratedAttribute>(true) is not null)
                         {
                             return;
                         }

@@ -96,11 +96,15 @@ namespace OoLunar.DocBot.AssemblyProviders
             arguments.Append(" package ");
             arguments.Append(packageId);
             arguments.Append(' ');
-            if (packageVersion is not null)
+            if (!string.IsNullOrWhiteSpace(packageVersion))
             {
                 arguments.Append("--version ");
                 arguments.Append(packageVersion);
                 arguments.Append(' ');
+            }
+            else
+            {
+                arguments.Append("--prerelease ");
             }
 
             arguments.Append("--framework ");
@@ -145,7 +149,7 @@ namespace OoLunar.DocBot.AssemblyProviders
             List<string> assemblies = new();
             foreach (string file in Directory.EnumerateFiles(path, "*.dll"))
             {
-                if (packages.Any(package => package.Equals(Path.GetFileNameWithoutExtension(file), StringComparison.OrdinalIgnoreCase)))
+                if (packages.Any(package => package.EndsWith(Path.GetFileNameWithoutExtension(file), StringComparison.Ordinal)))
                 {
                     assemblies.Add(file);
                 }

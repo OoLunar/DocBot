@@ -22,7 +22,8 @@ namespace OoLunar.DocBot
             typeof(NullableAttribute).GetFullGenericTypeName(),
             typeof(NullableContextAttribute).GetFullGenericTypeName(),
             typeof(OptionalAttribute).GetFullGenericTypeName(),
-            typeof(AsyncStateMachineAttribute).GetFullGenericTypeName()
+            typeof(AsyncStateMachineAttribute).GetFullGenericTypeName(),
+            typeof(IsReadOnlyAttribute).GetFullGenericTypeName(),
         };
 
         public static string TrimLength(this string value, int length) => value.Length > length ? $"{value[..(length - 1)].Trim()}…" : value;
@@ -121,7 +122,14 @@ namespace OoLunar.DocBot
                 }
 
                 CustomAttributeData attribute = attributes[i];
-                stringBuilder.Append(attribute.AttributeType.GetFullGenericTypeName());
+                string attributeName = attribute.AttributeType.GetFullGenericTypeName();
+                int indexOfAttribute = attributeName.LastIndexOf("Attribute", StringComparison.Ordinal);
+                if (indexOfAttribute != -1)
+                {
+                    attributeName = $"{attributeName[..indexOfAttribute]}{attributeName[(indexOfAttribute + 9)..]}";
+                }
+
+                stringBuilder.Append(attributeName);
                 Type[] genericArguments = attribute.AttributeType.GetGenericArguments();
                 if (genericArguments.Length != 0)
                 {
@@ -129,13 +137,7 @@ namespace OoLunar.DocBot
                     for (int j = 0; j < genericArguments.Length; j++)
                     {
                         Type genericArgument = genericArguments[j];
-                        string attributeName = genericArgument.GetFullGenericTypeName();
-                        if (attributeName.EndsWith("Attribute", StringComparison.Ordinal))
-                        {
-                            attributeName = attributeName[..^9];
-                        }
-
-                        stringBuilder.Append(attributeName);
+                        stringBuilder.Append(genericArgument.GetFullGenericTypeName());
                         if (j != genericArguments.Length - 1)
                         {
                             stringBuilder.Append(", ");
@@ -150,17 +152,47 @@ namespace OoLunar.DocBot
                     for (int j = 0; j < attribute.ConstructorArguments.Count; j++)
                     {
                         CustomAttributeTypedArgument argument = attribute.ConstructorArguments[j];
-                        stringBuilder.Append(argument.Value switch
+                        bool isEnum = false;
+                        Type? enumType = argument.ArgumentType;
+                        while (enumType.BaseType is not null)
                         {
-                            Enum @enum => $"{@enum.GetType().Name}.{@enum}",
-                            string @string => $"\"{@string}\"",
-                            char @char => $"'{@char}'",
-                            bool @bool => @bool ? "true" : "false",
-                            null => "null",
-                            _ => argument.Value
-                        });
+                            if (enumType.BaseType == typeof(Enum))
+                            {
+                                isEnum = true;
+                                break;
+                            }
 
-                        if (j != attribute.ConstructorArguments.Count - 1)
+                            enumType = enumType.BaseType;
+                        }
+
+                        if (isEnum)
+                        {
+                            List<string> enumValues = new();
+                            Enum @enum = (Enum)Enum.Parse(enumType, argument.Value?.ToString() ?? "0");
+                            foreach (object value in Enum.GetValues(enumType))
+                            {
+                                Enum enumValue = (Enum)Enum.Parse(enumType, value.ToString()!);
+                                if (@enum.HasFlag(enumValue))
+                                {
+                                    enumValues.Add($"{enumType.Name}.{value}");
+                                }
+                            }
+
+                            stringBuilder.Append(string.Join(" | ", enumValues));
+                        }
+                        else
+                        {
+                            stringBuilder.Append(argument.Value switch
+                            {
+                                string @string => $"\"{@string}\"",
+                                char @char => $"'{@char}'",
+                                bool @bool => @bool ? "true" : "false",
+                                null => "null",
+                                _ => argument.Value
+                            });
+                        }
+
+                        if (j != (attribute.ConstructorArguments.Count - 1) || attribute.NamedArguments.Count != 0)
                         {
                             stringBuilder.Append(", ");
                         }
@@ -189,7 +221,11 @@ namespace OoLunar.DocBot
                     stringBuilder.Append(')');
                 }
 
-                if (i == attributes.Count - 1)
+                if (i != attributes.Count - 1)
+                {
+                    stringBuilder.Append(", ");
+                }
+                else if (i == attributes.Count - 1)
                 {
                     stringBuilder.Append(']');
                 }
@@ -235,7 +271,7 @@ namespace OoLunar.DocBot
             {
                 stringBuilder.Append("abstract ");
             }
-            else if (type.IsSealed)
+            else if (type.IsSealed && !type.IsValueType)
             {
                 stringBuilder.Append("sealed ");
             }
@@ -247,10 +283,23 @@ namespace OoLunar.DocBot
 
             if (type.IsValueType)
             {
+                // Check if type is assignable to IEquatable
+                if (type.GetInterfaces().Any(@interface => @interface.IsGenericType && @interface.GetGenericTypeDefinition() == typeof(IEquatable<>))
+                    && type.GetMethod("op_Equality") is MethodInfo equalityOperator && equalityOperator.GetCustomAttribute<CompilerGeneratedAttribute>() is not null)
+                {
+                    stringBuilder.Append("record ");
+                }
+
                 stringBuilder.Append("struct ");
             }
             else if (type.IsClass)
             {
+                // Only found on class declarations and not record structs
+                if (type.GetMethod("<Clone>$") is not null)
+                {
+                    stringBuilder.Append("record ");
+                }
+
                 stringBuilder.Append("class ");
             }
             else if (type.IsInterface)
@@ -259,7 +308,13 @@ namespace OoLunar.DocBot
             }
 
             // Type name
-            stringBuilder.Append(type.Name);
+            string plainName = type.Name;
+            int indexOfGeneric = plainName.LastIndexOf('`');
+            if (indexOfGeneric != -1)
+            {
+                plainName = plainName[..indexOfGeneric];
+            }
+            stringBuilder.Append(plainName);
 
             // Generic parameters
             if (type.IsGenericType)
@@ -292,7 +347,7 @@ namespace OoLunar.DocBot
             if ((type.BaseType is not null && type.BaseType != typeof(object) && type.BaseType != typeof(ValueType)) || interfaces.Length != 0)
             {
                 stringBuilder.Append(" : ");
-                if (type.BaseType is not null)
+                if (type.BaseType is not null && type.BaseType != typeof(object) && type.BaseType != typeof(ValueType))
                 {
                     stringBuilder.Append(type.BaseType.GetFullGenericTypeName());
                     if (interfaces.Length != 0)
@@ -536,8 +591,11 @@ namespace OoLunar.DocBot
                     {
                         stringBuilder.Append("this ");
                     }
-
-                    if (parameter.GetCustomAttribute<InAttribute>() is not null)
+                    else if (parameter.GetCustomAttribute<ParamArrayAttribute>() is not null)
+                    {
+                        stringBuilder.Append("params ");
+                    }
+                    else if (parameter.GetCustomAttribute<InAttribute>() is not null)
                     {
                         stringBuilder.Append("in ");
                     }
@@ -545,9 +603,9 @@ namespace OoLunar.DocBot
                     {
                         stringBuilder.Append("out ");
                     }
-                    else if (parameter.GetCustomAttribute<ParamArrayAttribute>() is not null)
+                    else if (parameter.ParameterType.IsByRef)
                     {
-                        stringBuilder.Append("params ");
+                        stringBuilder.Append("ref ");
                     }
 
                     stringBuilder.Append(parameter.ParameterType.GetFullGenericTypeName());
@@ -602,17 +660,16 @@ namespace OoLunar.DocBot
             // Access modifiers
             if (propertyInfo.GetMethod is not null || propertyInfo.SetMethod is not null)
             {
-                if ((propertyInfo.GetMethod?.IsPublic ?? false) || (propertyInfo.SetMethod?.IsPublic ?? false))
-                {
-                    stringBuilder.Append("public ");
-                }
-
                 if ((propertyInfo.GetMethod?.IsFamily ?? false) || (propertyInfo.SetMethod?.IsFamily ?? false))
                 {
                     stringBuilder.Append("protected ");
                 }
 
-                if ((propertyInfo.GetMethod?.IsAssembly ?? false) || (propertyInfo.SetMethod?.IsAssembly ?? false))
+                if ((propertyInfo.GetMethod?.IsPublic ?? false) || (propertyInfo.SetMethod?.IsPublic ?? false))
+                {
+                    stringBuilder.Append("public ");
+                }
+                else if ((propertyInfo.GetMethod?.IsAssembly ?? false) || (propertyInfo.SetMethod?.IsAssembly ?? false))
                 {
                     stringBuilder.Append("internal ");
                 }
@@ -851,7 +908,7 @@ namespace OoLunar.DocBot
             else if (type.IsGenericType)
             {
                 // type.Name contains `1 (Action`1) instead of brackets. We chop off the backticks and append the `<` and `>` to the front and back, with the type arguments in between.
-                stringBuilder.Append(type.Name.Contains('`') ? type.Name.AsSpan(0, type.Name.IndexOf('`')) : type.Name);
+                stringBuilder.Append(type.Name.Contains('`') ? type.Name.AsSpan(0, type.Name.LastIndexOf('`')) : type.Name);
                 stringBuilder.Append('<');
 
                 // This is a closed generic type (e.g., List<int>)
