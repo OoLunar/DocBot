@@ -843,6 +843,10 @@ namespace OoLunar.DocBot
                 // We also append a `?` to the end of the type name to represent the nullable type.
                 stringBuilder.Append(GetFullGenericTypeName(underlyingNullableType) + "?");
             }
+            else if (type.IsByRef)
+            {
+                stringBuilder.Append(GetFullGenericTypeName(type.GetElementType()!));
+            }
             // Test if the type is a generic type.
             else if (type.IsGenericType)
             {
