@@ -15,10 +15,14 @@ namespace OoLunar.DocBot
     {
         private static readonly CSharpCodeProvider _codeDom = new();
         private static readonly string[] _ignoreAttributes = new[] {
+            typeof(OutAttribute).GetFullGenericTypeName(),
+            typeof(InAttribute).GetFullGenericTypeName(),
+            typeof(ParamArrayAttribute).GetFullGenericTypeName(),
             typeof(ExtensionAttribute).GetFullGenericTypeName(),
             typeof(NullableAttribute).GetFullGenericTypeName(),
             typeof(NullableContextAttribute).GetFullGenericTypeName(),
-            typeof(OptionalAttribute).GetFullGenericTypeName()
+            typeof(OptionalAttribute).GetFullGenericTypeName(),
+            typeof(AsyncStateMachineAttribute).GetFullGenericTypeName()
         };
 
         public static string TrimLength(this string value, int length) => value.Length > length ? $"{value[..(length - 1)].Trim()}…" : value;
@@ -125,7 +129,13 @@ namespace OoLunar.DocBot
                     for (int j = 0; j < genericArguments.Length; j++)
                     {
                         Type genericArgument = genericArguments[j];
-                        stringBuilder.Append(genericArgument.GetFullGenericTypeName());
+                        string attributeName = genericArgument.GetFullGenericTypeName();
+                        if (attributeName.EndsWith("Attribute", StringComparison.Ordinal))
+                        {
+                            attributeName = attributeName[..^9];
+                        }
+
+                        stringBuilder.Append(attributeName);
                         if (j != genericArguments.Length - 1)
                         {
                             stringBuilder.Append(", ");
@@ -480,6 +490,11 @@ namespace OoLunar.DocBot
                     // override <return type> <base type>.<base method>
                     // override void object.ToString
                     stringBuilder.Append("override ");
+                    if (methodInfo.GetCustomAttribute<AsyncStateMachineAttribute>() is not null)
+                    {
+                        stringBuilder.Append("async ");
+                    }
+
                     stringBuilder.Append(methodInfo.ReturnType.GetFullGenericTypeName());
                     stringBuilder.Append(' ');
                     stringBuilder.Append(baseImplementation.DeclaringType!.GetFullGenericTypeName());
@@ -490,6 +505,10 @@ namespace OoLunar.DocBot
                 {
                     // <return type> <method name>
                     // void ToString
+                    if (methodInfo.GetCustomAttribute<AsyncStateMachineAttribute>() is not null)
+                    {
+                        stringBuilder.Append("async ");
+                    }
                     stringBuilder.Append(methodInfo.ReturnType.GetFullGenericTypeName());
                     stringBuilder.Append(' ');
                     stringBuilder.Append(methodInfo.Name);
@@ -516,6 +535,19 @@ namespace OoLunar.DocBot
                     if (i == 0 && methodBase.GetCustomAttribute<ExtensionAttribute>() is not null)
                     {
                         stringBuilder.Append("this ");
+                    }
+
+                    if (parameter.GetCustomAttribute<InAttribute>() is not null)
+                    {
+                        stringBuilder.Append("in ");
+                    }
+                    else if (parameter.GetCustomAttribute<OutAttribute>() is not null)
+                    {
+                        stringBuilder.Append("out ");
+                    }
+                    else if (parameter.GetCustomAttribute<ParamArrayAttribute>() is not null)
+                    {
+                        stringBuilder.Append("params ");
                     }
 
                     stringBuilder.Append(parameter.ParameterType.GetFullGenericTypeName());
