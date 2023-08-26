@@ -285,7 +285,7 @@ namespace OoLunar.DocBot
             {
                 // Check if type is assignable to IEquatable
                 if (type.GetInterfaces().Any(@interface => @interface.IsGenericType && @interface.GetGenericTypeDefinition() == typeof(IEquatable<>))
-                    && type.GetMethod("op_Equality") is MethodInfo equalityOperator && equalityOperator.GetCustomAttribute<CompilerGeneratedAttribute>() is not null)
+                    && type.GetMethods().FirstOrDefault(method => method.Name == "op_Equality") is MethodInfo equalityOperator && equalityOperator.GetCustomAttribute<CompilerGeneratedAttribute>() is not null)
                 {
                     stringBuilder.Append("record ");
                 }
