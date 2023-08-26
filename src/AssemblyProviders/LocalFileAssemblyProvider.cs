@@ -17,7 +17,15 @@ namespace OoLunar.DocBot.AssemblyProviders
         public LocalFileAssemblyProvider(ILogger<LocalFileAssemblyProvider>? logger = null)
         {
             _logger = logger ?? NullLoggerFactory.Instance.CreateLogger<LocalFileAssemblyProvider>();
-            _assemblyPaths = Directory.EnumerateFiles(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!, "*.dll").ToArray();
+
+            string? currentDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            if (string.IsNullOrWhiteSpace(currentDirectory) || !Directory.Exists(currentDirectory))
+            {
+                // Warning IL3000
+                currentDirectory = AppContext.BaseDirectory;
+            }
+
+            _assemblyPaths = Directory.EnumerateFiles(currentDirectory, "*.dll").ToArray();
         }
 
         public LocalFileAssemblyProvider(IReadOnlyList<string> assemblyPaths, ILogger<LocalFileAssemblyProvider>? logger = null)
