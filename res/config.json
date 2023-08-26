@@ -15,9 +15,12 @@
     "nuget": {
         "path": "packages",
         "packages": {
-            "DSharpPlus": "",
-            "OoLunar.HyperSharp": "",
-            "Microsoft.Extensions.DependencyInjection": ""
+            "DSharpPlus": "4.4.2",
+            "DSharpPlus.CommandsNext": "4.4.2",
+            "DSharpPlus.Interactivity": "4.4.2",
+            "DSharpPlus.VoiceNext": "4.4.2",
+            "DSharpPlus.SlashCommands": "4.4.2",
+            "DSharpPlus.Lavalink": "4.4.2"
         }
     }
 }
