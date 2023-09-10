@@ -23,7 +23,7 @@ namespace OoLunar.DocBot.Events.Handlers
             _logger = logger ?? NullLoggerFactory.Instance.CreateLogger<AutoCompleteEventHandler>();
         }
 
-        [DiscordEvent(0)]
+        [DiscordEvent]
         public Task OnAutoCompleteResponse(DiscordClient _, InteractionCreateEventArgs eventArgs)
         {
             if (eventArgs.Interaction.Type != InteractionType.AutoComplete || eventArgs.Interaction.Data.Name != "documentation")

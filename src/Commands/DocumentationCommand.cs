@@ -1,16 +1,14 @@
 using System;
-using System.Linq;
+using System.ComponentModel;
 using System.Threading.Tasks;
-using DSharpPlus;
-using DSharpPlus.Entities;
-using DSharpPlus.EventArgs;
+using DSharpPlus.CommandAll.Attributes;
+using DSharpPlus.CommandAll.Commands;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using OoLunar.DocBot.Events;
 
 namespace OoLunar.DocBot.Commands
 {
-    public sealed class DocumentationCommand
+    public sealed class DocumentationCommand : BaseCommand
     {
         private readonly ILogger<DocumentationCommand> _logger;
         private readonly DocumentationProvider _documentationProvider;
@@ -21,20 +19,14 @@ namespace OoLunar.DocBot.Commands
             _logger = logger ?? NullLoggerFactory.Instance.CreateLogger<DocumentationCommand>();
         }
 
-        [DiscordEvent(0)]
-        public async Task GetDocumentationAsync(DiscordClient _, InteractionCreateEventArgs eventArgs)
+        [Command("documentation"), Description("Retrieves documentation for a given type or member.")]
+        public async Task GetDocumentationAsync(CommandContext context, [Description("Which type or member to grab documentation upon."), AutoComplete, RemainingText] string query)
         {
-            if (eventArgs.Interaction.Type != InteractionType.ApplicationCommand || eventArgs.Interaction.Data.Name != "documentation")
-            {
-                return;
-            }
-
             DocumentationMember? documentation = null;
-            string query = eventArgs.Interaction.Data.Options.First().Value.ToString() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(query))
             {
                 _logger.LogDebug("No query provided.");
-                await eventArgs.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent("No query provided."));
+                await context.ReplyAsync("No query provided.");
             }
             else if (!int.TryParse(query, out int id) || !_documentationProvider.Members.TryGetValue(id, out documentation))
             {
@@ -60,19 +52,19 @@ namespace OoLunar.DocBot.Commands
             if (documentation is null)
             {
                 _logger.LogDebug("No documentation found for: {Query}.", query);
-                await eventArgs.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent("No documentation found."));
+                await context.ReplyAsync("No documentation found.");
                 return;
             }
 
             _logger.LogDebug("Documentation found for: {Query}.", documentation.DisplayName);
             if (documentation.SourceUri.IsValueCreated)
             {
-                await eventArgs.Interaction.CreateResponseAsync(InteractionResponseType.ChannelMessageWithSource, new DiscordInteractionResponseBuilder().WithContent(documentation.Content));
+                await context.ReplyAsync(documentation.Content);
                 return;
             }
 
             // Defer
-            await eventArgs.Interaction.CreateResponseAsync(InteractionResponseType.DeferredChannelMessageWithSource);
+            await context.DelayAsync();
             Uri? source = await documentation.SourceUri.Value;
             if (source is not null)
             {
@@ -80,7 +72,7 @@ namespace OoLunar.DocBot.Commands
                 lines[0] = $"## [{lines[0][3..]}](<{source}>)";
                 documentation.Content = string.Join('\n', lines);
             }
-            await eventArgs.Interaction.EditOriginalResponseAsync(new DiscordWebhookBuilder().WithContent(documentation.Content));
+            await context.ReplyAsync(documentation.Content);
         }
     }
 }
