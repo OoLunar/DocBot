@@ -121,7 +121,7 @@ namespace OoLunar.DocBot
                 DiscordShardedClient shardedClient = new(new DiscordConfiguration()
                 {
                     Token = configuration.GetValue<string>("discord:token")!,
-                    Intents = TextCommandProcessor.RequiredIntents | DiscordIntents.MessageContents,
+                    Intents = SlashCommandProcessor.RequiredIntents | TextCommandProcessor.RequiredIntents | DiscordIntents.MessageContents,
                     LoggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>()
                 });
 
