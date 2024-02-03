@@ -52,7 +52,7 @@ namespace OoLunar.DocBot
                 return;
             }
 
-            Dictionary<int, DocumentationMember> members = new();
+            Dictionary<int, DocumentationMember> members = [];
             foreach (DocumentationMember member in await GetMembersAsync(assemblies))
             {
                 _logger.LogTrace("Loaded: {MemberName}", member.DisplayName);

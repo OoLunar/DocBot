@@ -1,14 +1,19 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.Threading.Tasks;
-using DSharpPlus.CommandAll.Attributes;
-using DSharpPlus.CommandAll.Commands;
+using DSharpPlus.Commands.Processors.SlashCommands;
+using DSharpPlus.Commands.Processors.SlashCommands.Attributes;
+using DSharpPlus.Commands.Processors.TextCommands.Attributes;
+using DSharpPlus.Commands.Trees;
+using DSharpPlus.Commands.Trees.Attributes;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace OoLunar.DocBot.Commands
 {
-    public sealed class DocumentationCommand : BaseCommand
+    public sealed class DocumentationCommand : IAutoCompleteProvider
     {
         private readonly ILogger<DocumentationCommand> _logger;
         private readonly DocumentationProvider _documentationProvider;
@@ -19,14 +24,14 @@ namespace OoLunar.DocBot.Commands
             _logger = logger ?? NullLoggerFactory.Instance.CreateLogger<DocumentationCommand>();
         }
 
-        [Command("documentation"), Description("Retrieves documentation for a given type or member.")]
-        public async Task GetDocumentationAsync(CommandContext context, [Description("Which type or member to grab documentation upon."), AutoComplete, RemainingText] string query)
+        [Command("documentation"), TextAlias("doc", "docs"), Description("Retrieves documentation for a given type or member.")]
+        public async Task GetDocumentationAsync(CommandContext context, [Description("Which type or member to grab documentation upon."), SlashAutoCompleteProvider<DocumentationCommand>, RemainingText] string query)
         {
             DocumentationMember? documentation = null;
             if (string.IsNullOrWhiteSpace(query))
             {
                 _logger.LogDebug("No query provided.");
-                await context.ReplyAsync("No query provided.");
+                await context.RespondAsync("No query provided.");
             }
             else if (!int.TryParse(query, out int id) || !_documentationProvider.Members.TryGetValue(id, out documentation))
             {
@@ -52,19 +57,19 @@ namespace OoLunar.DocBot.Commands
             if (documentation is null)
             {
                 _logger.LogDebug("No documentation found for: {Query}.", query);
-                await context.ReplyAsync("No documentation found.");
+                await context.RespondAsync("No documentation found.");
                 return;
             }
 
             _logger.LogDebug("Documentation found for: {Query}.", documentation.DisplayName);
             if (documentation.SourceUri.IsValueCreated)
             {
-                await context.ReplyAsync(documentation.Content);
+                await context.RespondAsync(documentation.Content);
                 return;
             }
 
             // Defer
-            await context.DelayAsync();
+            await context.DeferResponseAsync();
             Uri? source = await documentation.SourceUri.Value;
             if (source is not null)
             {
@@ -72,7 +77,32 @@ namespace OoLunar.DocBot.Commands
                 lines[0] = $"## [{lines[0][3..]}](<{source}>)";
                 documentation.Content = string.Join('\n', lines);
             }
-            await context.ReplyAsync(documentation.Content);
+
+            await context.EditResponseAsync(documentation.Content);
+        }
+
+        public ValueTask<Dictionary<string, object>> AutoCompleteAsync(AutoCompleteContext context)
+        {
+            string query = context.UserInput.ToString() ?? string.Empty;
+            _logger.LogDebug("Querying documentation for: \"{Query}\"", query);
+
+            Dictionary<string, object> choices = [];
+            foreach (DocumentationMember member in _documentationProvider.Members.Values)
+            {
+                if (!member.DisplayName.StartsWith(query, StringComparison.OrdinalIgnoreCase)
+                    && !member.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                choices.Add(member.DisplayName.TrimLength(100), member.GetHashCode().ToString(CultureInfo.InvariantCulture));
+                if (choices.Count == 10)
+                {
+                    break;
+                }
+            }
+
+            return ValueTask.FromResult(choices);
         }
     }
 }

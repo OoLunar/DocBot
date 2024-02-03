@@ -1,0 +1,34 @@
+using System.ComponentModel;
+using System.Linq;
+using System.Threading.Tasks;
+using DSharpPlus;
+using DSharpPlus.CommandAll.Attributes;
+using DSharpPlus.CommandAll.Commands;
+using Humanizer;
+using OoLunar.DocBot.Database;
+using OoLunar.DocBot.Entities;
+
+namespace OoLunar.DocBot.Commands
+{
+    public sealed partial class TagCommand
+    {
+        [Command("delete"), Description("Removes the tag from the database.")]
+        public static Task DeleteAsync(CommandContext context, [RemainingText, Description("The name of the tag.")] string name)
+        {
+            if (DatabaseTracker.GetTag(name) is not TagEntity tag)
+            {
+                return context.ReplyAsync($"Tag {name} not found.");
+            }
+            else if (!tag.History.Any(x => x.Author == context.User.Id) || context.Member!.Permissions.HasPermission(Permissions.ManageMessages))
+            {
+                return context.ReplyAsync($"Tag {name} can only be deleted by its creator, any of it's previous editors, or by someone with the {Formatter.InlineCode(Permissions.ManageMessages.Humanize(LetterCasing.Title))} permission.");
+            }
+            else if (DatabaseTracker.DeleteTag(name))
+            {
+                return context.ReplyAsync($"Tag {name} deleted.");
+            }
+
+            return context.ReplyAsync($"Tag {name} could not be deleted.");
+        }
+    }
+}

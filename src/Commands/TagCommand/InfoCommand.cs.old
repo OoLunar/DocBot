@@ -1,0 +1,33 @@
+using System.ComponentModel;
+using System.Globalization;
+using System.Threading.Tasks;
+using DSharpPlus;
+using DSharpPlus.CommandAll.Attributes;
+using DSharpPlus.CommandAll.Commands;
+using DSharpPlus.Entities;
+using OoLunar.DocBot.Database;
+using OoLunar.DocBot.Entities;
+
+namespace OoLunar.DocBot.Commands
+{
+    public sealed partial class TagCommand
+    {
+        [Command("info"), Description("Retrieves information about a tag.")]
+        public static Task InfoAsync(CommandContext context, [Description("The name of the tag.")] string name)
+        {
+            if (DatabaseTracker.GetTag(name) is not TagEntity tag)
+            {
+                return context.ReplyAsync($"Tag {name} not found.");
+            }
+
+            DiscordEmbedBuilder embedBuilder = new();
+            embedBuilder.WithTitle($"Tag {name}");
+            embedBuilder.WithDescription(tag.Content);
+            embedBuilder.AddField("Aliases", $"`{string.Join("`, `", tag.Aliases)}`");
+            embedBuilder.AddField("Created By", $"<@{tag.History[0].Author}> on {Formatter.Timestamp(tag.History[0].Timestamp)}");
+            embedBuilder.AddField("Last Updated By", $"<@{tag.History[^1].Author}> on {Formatter.Timestamp(tag.History[^1].Timestamp)}");
+            embedBuilder.AddField("Total Edits", (tag.History.Count - 1).ToString("N0", CultureInfo.InvariantCulture));
+            return context.ReplyAsync(embedBuilder);
+        }
+    }
+}

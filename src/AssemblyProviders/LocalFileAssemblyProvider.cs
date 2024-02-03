@@ -9,8 +9,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace OoLunar.DocBot.AssemblyProviders
 {
-    public sealed class LocalFileAssemblyProvider
+    public sealed class LocalFileAssemblyProvider : IAssemblyProvider
     {
+        public string Name { get; init; } = "local_file";
+
         private readonly ILogger<LocalFileAssemblyProvider> _logger;
         private readonly IReadOnlyList<string> _assemblyPaths;
 
@@ -21,7 +23,6 @@ namespace OoLunar.DocBot.AssemblyProviders
             string? currentDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             if (string.IsNullOrWhiteSpace(currentDirectory) || !Directory.Exists(currentDirectory))
             {
-                // Warning IL3000
                 currentDirectory = AppContext.BaseDirectory;
             }
 
@@ -53,7 +54,7 @@ namespace OoLunar.DocBot.AssemblyProviders
 
         public ValueTask<IEnumerable<Assembly>> GetAssembliesAsync()
         {
-            List<Assembly> assemblies = new();
+            List<Assembly> assemblies = [];
             foreach (string file in _assemblyPaths)
             {
                 try

@@ -12,19 +12,21 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace OoLunar.DocBot.AssemblyProviders
 {
-    public sealed class NugetAssemblyProvider
+    public sealed class NugetAssemblyProvider : IAssemblyProvider
     {
-        private static readonly string _framework = "net8.0";
-        private static readonly string _csproj = $"""
+
+        private const string TARGET_FRAMEWORK = ThisAssembly.Project.TargetFramework;
+        private const string CSPROJ_TEMPLATE = $"""
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Library</OutputType>
     <SuppressNETCoreSdkPreviewMessage>true</SuppressNETCoreSdkPreviewMessage>
-    <TargetFramework>{_framework}</TargetFramework>
+    <TargetFramework>{TARGET_FRAMEWORK}</TargetFramework>
   </PropertyGroup>
 </Project>
 """;
 
+        public string Name { get; init; } = "nuget";
         private readonly IConfiguration _configuration;
         private readonly ILogger<NugetAssemblyProvider> _logger;
 
@@ -54,7 +56,7 @@ namespace OoLunar.DocBot.AssemblyProviders
 
                 _logger.LogInformation("Restoring packages...");
                 Directory.CreateDirectory(assemblyPath);
-                File.WriteAllText(Path.Combine(assemblyPath, "OoLunar.DocBot.csproj"), _csproj);
+                File.WriteAllText(Path.Combine(assemblyPath, "OoLunar.DocBot.csproj"), CSPROJ_TEMPLATE);
 
                 foreach ((string packageId, string? packageVersion) in packages)
                 {
@@ -66,7 +68,7 @@ namespace OoLunar.DocBot.AssemblyProviders
                 ProcessStartInfo startInfo = new()
                 {
                     FileName = "dotnet",
-                    Arguments = $"publish {Path.Combine(assemblyPath, "OoLunar.DocBot.csproj")} --framework {_framework}",
+                    Arguments = $"publish {Path.Combine(assemblyPath, "OoLunar.DocBot.csproj")} --framework {TARGET_FRAMEWORK}",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
@@ -108,7 +110,7 @@ namespace OoLunar.DocBot.AssemblyProviders
             }
 
             arguments.Append("--framework ");
-            arguments.Append(_framework);
+            arguments.Append(TARGET_FRAMEWORK);
             arguments.Append(' ');
             if (sources is not null)
             {
@@ -140,13 +142,13 @@ namespace OoLunar.DocBot.AssemblyProviders
 
         public static IReadOnlyList<string> GetRequestedAssemblies(string assemblyPath, IEnumerable<string> packages)
         {
-            string path = Path.Combine(assemblyPath, $"bin/Release/{_framework}/publish/");
+            string path = Path.Combine(assemblyPath, $"bin/Release/{TARGET_FRAMEWORK}/publish/");
             if (!Directory.Exists(path))
             {
                 return new List<string>();
             }
 
-            List<string> assemblies = new();
+            List<string> assemblies = [];
             foreach (string file in Directory.EnumerateFiles(path, "*.dll"))
             {
                 if (packages.Any(package => package.EndsWith(Path.GetFileNameWithoutExtension(file), StringComparison.Ordinal)))

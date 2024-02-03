@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,88 +12,69 @@ namespace OoLunar.DocBot.GitHub
 {
     public sealed class GitHubRateLimitMessageHandler : DelegatingHandler
     {
-        private readonly SemaphoreSlim _semaphore;
-        private readonly ILogger<GitHubRateLimitMessageHandler> _logger;
+        private readonly SemaphoreSlim _rateLimitSemaphore = new(1, 1);
+        private readonly ILogger<GitHubRateLimitMessageHandler> _logger = NullLogger<GitHubRateLimitMessageHandler>.Instance;
 
-        public GitHubRateLimitMessageHandler(HttpMessageHandler innerHandler, ILogger<GitHubRateLimitMessageHandler>? logger = null) : base(innerHandler)
-        {
-            _logger = logger ?? NullLogger<GitHubRateLimitMessageHandler>.Instance;
-            _semaphore = new SemaphoreSlim(1, 1);
-        }
+        private int _rateLimitRemaining;
+        private DateTimeOffset _rateLimitReset = DateTimeOffset.MinValue;
 
-        protected override HttpResponseMessage Send(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            if (request.RequestUri is not null && request.RequestUri.Host != "api.github.com")
-            {
-                return base.Send(request, cancellationToken);
-            }
-
-            _semaphore.Wait(cancellationToken);
-            try
-            {
-                HttpResponseMessage responseMessage = base.Send(request, cancellationToken);
-                if (IsRatelimited(responseMessage, out TimeSpan? ratelimitExpires))
-                {
-                    _logger.LogInformation("Rate limit reached. Waiting {TimeSpan} before continuing.", ratelimitExpires);
-                    ValueTask<bool> ratelimit = new PeriodicTimer(ratelimitExpires.Value).WaitForNextTickAsync(cancellationToken);
-                    if (!ratelimit.IsCompleted)
-                    {
-                        ratelimit.AsTask().GetAwaiter().GetResult();
-                    }
-
-                    responseMessage = base.Send(request, cancellationToken);
-                }
-
-                return responseMessage;
-            }
-            finally
-            {
-                _semaphore.Release();
-            }
-        }
+        public GitHubRateLimitMessageHandler() : base(new HttpClientHandler()) { }
+        public GitHubRateLimitMessageHandler(HttpMessageHandler innerHandler) : base(innerHandler) { }
+        public GitHubRateLimitMessageHandler(HttpMessageHandler innerHandler, ILogger<GitHubRateLimitMessageHandler> logger) : base(innerHandler) => _logger = logger ?? NullLogger<GitHubRateLimitMessageHandler>.Instance;
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            if (request.RequestUri is not null && request.RequestUri.Host != "api.github.com")
+            if (request.RequestUri is null)
+            {
+                // This should never happen.
+                throw new InvalidOperationException("Request URI is null.");
+            }
+            else if (!request.RequestUri.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase))
             {
                 return await base.SendAsync(request, cancellationToken);
             }
 
-            await _semaphore.WaitAsync(cancellationToken);
-            try
+            HttpResponseMessage response;
+            do
             {
-                HttpResponseMessage responseMessage = await base.SendAsync(request, cancellationToken);
-                if (IsRatelimited(responseMessage, out TimeSpan? ratelimitExpires))
+                // Pre-emptively wait for ratelimits to be reset.
+                await _rateLimitSemaphore.WaitAsync(cancellationToken);
+                try
                 {
-                    _logger.LogInformation("Rate limit reached. Waiting {TimeSpan} before continuing.", ratelimitExpires);
-                    await new PeriodicTimer(ratelimitExpires.Value).WaitForNextTickAsync(cancellationToken);
-                    responseMessage = await base.SendAsync(request, cancellationToken);
+                    if (_rateLimitRemaining == 0)
+                    {
+                        TimeSpan waitTime = _rateLimitReset - DateTimeOffset.UtcNow;
+                        _logger.LogWarning("Hit the ratelimit. Waiting until {RateLimitReset}...", _rateLimitReset);
+                        await Task.Delay(waitTime, cancellationToken);
+                    }
+                }
+                finally
+                {
+                    _rateLimitSemaphore.Release();
                 }
 
-                return responseMessage;
-            }
-            finally
-            {
-                _semaphore.Release();
-            }
-        }
+                // Make the request
+                response = await base.SendAsync(request, cancellationToken);
 
-        private static bool IsRatelimited(HttpResponseMessage responseMessage, [NotNullWhen(true)] out TimeSpan? ratelimitExpires)
-        {
-            ratelimitExpires = null;
-            if (responseMessage.Headers.TryGetValues("X-RateLimit-Remaining", out IEnumerable<string>? remaining)
-                && remaining.Any()
-                && int.TryParse(remaining.First(), out int remainingRequests)
-                && remainingRequests == 0
-                && responseMessage.Headers.TryGetValues("X-RateLimit-Reset", out IEnumerable<string>? reset)
-                && reset.Any()
-                && long.TryParse(reset.First(), out long resetTime))
-            {
-                ratelimitExpires = TimeSpan.FromSeconds(resetTime - DateTimeOffset.UtcNow.ToUnixTimeSeconds());
-                return true;
-            }
+                // Update ratelimits
+                if (!response.Headers.TryGetValues("x-ratelimit-reset", out IEnumerable<string>? resetValues) || !response.Headers.TryGetValues("x-ratelimit-remaining", out IEnumerable<string>? remainingValues))
+                {
+                    // This should never happen.
+                    throw new InvalidOperationException("Missing x-ratelimit-reset or x-ratelimit-remaining headers.");
+                }
+                else if (!int.TryParse(remainingValues.Single(), out int remaining) || !long.TryParse(resetValues.Single(), out long reset))
+                {
+                    // This should never happen.
+                    throw new InvalidOperationException("Unable to parse x-ratelimit-reset or x-ratelimit-remaining headers.");
+                }
+                else
+                {
+                    _rateLimitRemaining = remaining;
+                    _rateLimitReset = DateTimeOffset.FromUnixTimeSeconds(reset);
+                }
+            } while (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.TooManyRequests);
 
-            return false;
+            return response;
         }
     }
 }

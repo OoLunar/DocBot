@@ -5,13 +5,14 @@ using System.Net.Http;
 using System.Reflection;
 using System.Threading.Tasks;
 using DSharpPlus;
-using DSharpPlus.CommandAll;
-using DSharpPlus.CommandAll.Parsers;
+using DSharpPlus.Commands;
+using DSharpPlus.Commands.Processors.SlashCommands;
+using DSharpPlus.Commands.Processors.TextCommands;
+using DSharpPlus.Commands.Processors.TextCommands.Parsing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OoLunar.DocBot.AssemblyProviders;
-using OoLunar.DocBot.Events;
 using OoLunar.DocBot.GitHub;
 using Serilog;
 using Serilog.Events;
@@ -21,8 +22,6 @@ namespace OoLunar.DocBot
 {
     public sealed class Program
     {
-        private static readonly string[] _prefixes = new string[1] { "d" };
-
         public static async Task Main(string[] args)
         {
             IServiceCollection services = new ServiceCollection();
@@ -83,60 +82,64 @@ namespace OoLunar.DocBot
             Assembly currentAssembly = typeof(Program).Assembly;
             services.AddSingleton((serviceProvider) =>
             {
-                DiscordEventManager eventManager = new(serviceProvider);
-                eventManager.GatherEventHandlers(currentAssembly);
-                return eventManager;
-            });
-
-            services.AddSingleton((serviceProvider) =>
-            {
                 ILogger<GitHubRateLimitMessageHandler> logger = serviceProvider.GetRequiredService<ILogger<GitHubRateLimitMessageHandler>>();
                 AssemblyInformationalVersionAttribute? assemblyInformationalVersion = typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
                 HttpClient httpClient = new(new GitHubRateLimitMessageHandler(new HttpClientHandler(), logger));
-#if DEBUG
-                httpClient.DefaultRequestHeaders.Add("User-Agent", $"OoLunar.DocBot/{assemblyInformationalVersion?.InformationalVersion ?? "0.1.0"}-dev");
-#else
                 httpClient.DefaultRequestHeaders.Add("User-Agent", $"OoLunar.DocBot/{assemblyInformationalVersion?.InformationalVersion ?? "0.1.0"}");
-#endif
                 return httpClient;
             });
 
             services.AddSingleton<GitHubMetadataRetriever>();
-            services.AddSingleton((serviceProvider) => new NugetAssemblyProvider(serviceProvider.GetRequiredService<IConfiguration>(), serviceProvider.GetRequiredService<ILogger<NugetAssemblyProvider>>()));
             services.AddSingleton((serviceProvider) =>
             {
-                NugetAssemblyProvider assemblyProvider = serviceProvider.GetRequiredService<NugetAssemblyProvider>();
-                GitHubMetadataRetriever github = serviceProvider.GetRequiredService<GitHubMetadataRetriever>();
-                ILogger<DocumentationProvider> logger = serviceProvider.GetRequiredService<ILogger<DocumentationProvider>>();
-                return new DocumentationProvider(assemblyProvider.GetAssembliesAsync, github, logger);
+                IConfiguration configuration = serviceProvider.GetRequiredService<IConfiguration>();
+                string? assemblyProviderName = configuration.GetValue<string>("assembly_provider");
+                if (string.IsNullOrWhiteSpace(assemblyProviderName))
+                {
+                    throw new InvalidOperationException("No assembly provider was specified.");
+                }
+
+                foreach (Type type in currentAssembly.GetTypes())
+                {
+                    if (type.IsAssignableTo(typeof(IAssemblyProvider)) // If the type implements IAssemblyProvider
+                        && !type.IsAbstract // If the type isn't an interface or abstract class
+                        && ActivatorUtilities.CreateInstance(serviceProvider, type) is IAssemblyProvider assemblyProvider // If the service provider was able to create an instance of the type
+                        && assemblyProvider.Name.Equals(assemblyProviderName, StringComparison.OrdinalIgnoreCase)) // If the assembly provider name matches the one specified in the configuration
+                    {
+                        return assemblyProvider;
+                    }
+                }
+
+                throw new InvalidOperationException($"No assembly provider with the name {assemblyProviderName} was found.");
             });
 
-            services.AddSingleton(serviceProvider =>
+            services.AddSingleton<AssemblyProviderAsync>((serviceProvider) => serviceProvider.GetRequiredService<IAssemblyProvider>().GetAssembliesAsync);
+            services.AddSingleton<DocumentationProvider>();
+            services.AddSingleton(async serviceProvider =>
             {
                 IConfiguration configuration = serviceProvider.GetRequiredService<IConfiguration>();
-                DiscordEventManager eventManager = serviceProvider.GetRequiredService<DiscordEventManager>();
                 DiscordShardedClient shardedClient = new(new DiscordConfiguration()
                 {
                     Token = configuration.GetValue<string>("discord:token")!,
-                    Intents = eventManager.Intents,
+                    Intents = TextCommandProcessor.RequiredIntents | DiscordIntents.MessageContents,
                     LoggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>()
                 });
 
-                eventManager.RegisterEventHandlers(shardedClient);
-                IReadOnlyDictionary<int, CommandAllExtension> commandAllShards = shardedClient.UseCommandAllAsync(new CommandAllConfiguration()
+                IReadOnlyDictionary<int, CommandsExtension> extensionShards = await shardedClient.UseCommandsAsync(new CommandsConfiguration()
                 {
 #if DEBUG
                     DebugGuildId = configuration.GetValue<ulong?>("discord:debug_guild_id"),
 #endif
-                    PrefixParser = new PrefixParser(configuration.GetSection("discord:prefixes").Get<string[]>() ?? _prefixes),
                     ServiceProvider = serviceProvider
-                }).GetAwaiter().GetResult();
+                });
 
-                foreach (CommandAllExtension commandAll in commandAllShards.Values)
+                foreach (CommandsExtension extension in extensionShards.Values)
                 {
-                    commandAll.CommandManager.AddCommands(commandAll, currentAssembly);
-                    commandAll.ArgumentConverterManager.AddArgumentConverters(currentAssembly);
-                    eventManager.RegisterEventHandlers(commandAll);
+                    extension.AddCommands(currentAssembly);
+                    await extension.AddProcessorsAsync(new SlashCommandProcessor(), new TextCommandProcessor(new()
+                    {
+                        PrefixResolver = new DefaultPrefixResolver(configuration.GetValue("discord:prefix", "d!")!).ResolvePrefixAsync
+                    }));
                 }
 
                 return shardedClient;
@@ -148,7 +151,7 @@ namespace OoLunar.DocBot
             DocumentationProvider documentationProvider = serviceProvider.GetRequiredService<DocumentationProvider>();
             await documentationProvider.ReloadAsync();
 
-            DiscordShardedClient discordShardedClient = serviceProvider.GetRequiredService<DiscordShardedClient>();
+            DiscordShardedClient discordShardedClient = await serviceProvider.GetRequiredService<Task<DiscordShardedClient>>();
             await discordShardedClient.StartAsync();
             await Task.Delay(-1);
         }

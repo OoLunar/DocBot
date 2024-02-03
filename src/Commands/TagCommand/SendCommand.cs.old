@@ -1,0 +1,17 @@
+using System.ComponentModel;
+using System.Threading.Tasks;
+using DSharpPlus;
+using DSharpPlus.CommandAll.Attributes;
+using DSharpPlus.CommandAll.Commands;
+using OoLunar.DocBot.Database;
+
+namespace OoLunar.DocBot.Commands
+{
+    public sealed partial class TagCommand
+    {
+        [Command("send"), Description("Sends a predefined wall of text.")]
+        public static Task SendAsync(CommandContext context, [RemainingText, Description("The name of the tag.")] string name) => DatabaseTracker.GetTagContent(name) is string content
+            ? context.ReplyAsync(content)
+            : context.ReplyAsync($"Tag {Formatter.InlineCode(Formatter.Sanitize(name))} not found.");
+    }
+}
