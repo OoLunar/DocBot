@@ -30,7 +30,7 @@ namespace OoLunar.DocBot
 #if DEBUG
                 .AddJsonFile("config.debug.json", true, true)
 #endif
-                .AddEnvironmentVariables("DocBot_")
+                .AddEnvironmentVariables("DocBot__")
                 .Build());
 
             services.AddLogging(loggerBuilder =>
