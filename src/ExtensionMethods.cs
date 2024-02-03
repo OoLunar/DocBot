@@ -72,6 +72,7 @@ namespace OoLunar.DocBot
             Type type => type.IsEnum ? "Enum" : type.IsInterface ? "Interface" : type.IsValueType ? "Struct" : "Class",
             MethodInfo methodInfo => methodInfo.IsSpecialName ? "Property" : "Method",
             PropertyInfo => "Property",
+            FieldInfo fieldInfo when fieldInfo.IsLiteral => "Constant",
             FieldInfo => "Field",
             EventInfo => "Event",
             ConstructorInfo => "Constructor",
@@ -745,15 +746,7 @@ namespace OoLunar.DocBot
             if (propertyInfo.GetCustomAttribute<DefaultValueAttribute>() is DefaultValueAttribute defaultValueAttribute)
             {
                 stringBuilder.Append(" = ");
-                stringBuilder.Append(defaultValueAttribute.Value switch
-                {
-                    Enum @enum => $"{@enum.GetType().Name}.{@enum}",
-                    string @string => $"\"{@string}\"",
-                    char @char => $"'{@char}'",
-                    bool @bool => @bool ? "true" : "false",
-                    null => "null",
-                    _ => defaultValueAttribute.Value
-                });
+                stringBuilder.Append(defaultValueAttribute.Value.FormatUnknownObject(propertyInfo.PropertyType));
                 stringBuilder.Append(';');
             }
 
@@ -787,7 +780,7 @@ namespace OoLunar.DocBot
             // Modifiers
             if (fieldInfo.IsStatic)
             {
-                stringBuilder.Append("static ");
+                stringBuilder.Append(fieldInfo.IsLiteral ? "const " : "static ");
             }
 
             if (fieldInfo.IsInitOnly)
@@ -805,7 +798,12 @@ namespace OoLunar.DocBot
             if (fieldInfo.GetCustomAttribute<DefaultValueAttribute>() is DefaultValueAttribute defaultValueAttribute)
             {
                 stringBuilder.Append(" = ");
-                stringBuilder.Append(defaultValueAttribute.Value);
+                stringBuilder.Append(defaultValueAttribute.Value.FormatUnknownObject(fieldInfo.FieldType));
+            }
+            else if (fieldInfo.IsLiteral)
+            {
+                stringBuilder.Append(" = ");
+                stringBuilder.Append(fieldInfo.GetRawConstantValue().FormatUnknownObject(fieldInfo.FieldType));
             }
 
             stringBuilder.Append(';');
@@ -946,6 +944,18 @@ namespace OoLunar.DocBot
 
             return stringBuilder.ToString();
         }
+
+        private static string FormatUnknownObject(this object? obj, Type? objType = null) => obj switch
+        {
+            string @string => $"\"{@string}\"",
+            null => "null",
+            // Format the enum as if it's being declared
+            _ when objType is not null && objType.IsEnum => Enum.Parse(objType, obj.ToString()!).ToString()!.Split(", ").Select(value => $"{objType.Name}.{value}").Aggregate((a, b) => $"{a} | {b}"),
+            // Handle these types later after we've established that the type is not an enum
+            char @char => $"'{@char}'",
+            bool @bool => @bool ? "true" : "false",
+            _ => obj.ToString()!
+        };
 
         private static string GetFriendlyTypeName(Type type) => _codeDom.GetTypeOutput(new(type)).Split('.').Last();
     }
