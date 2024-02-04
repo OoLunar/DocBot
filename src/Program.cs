@@ -138,7 +138,8 @@ namespace OoLunar.DocBot
                     extension.AddCommands(currentAssembly);
                     await extension.AddProcessorsAsync(new SlashCommandProcessor(), new TextCommandProcessor(new()
                     {
-                        PrefixResolver = new DefaultPrefixResolver(configuration.GetValue("discord:prefix", "d!")!).ResolvePrefixAsync
+                        PrefixResolver = new DefaultPrefixResolver(configuration.GetValue("discord:prefix", "d!")!).ResolvePrefixAsync,
+                        IgnoreBots = false
                     }));
                 }
 
