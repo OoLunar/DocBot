@@ -14,7 +14,7 @@ namespace OoLunar.DocBot
     public static class ExtensionMethods
     {
         private static readonly CSharpCodeProvider _codeDom = new();
-        private static readonly string[] _ignoreAttributes = new[] {
+        private static readonly string[] _ignoreAttributes = [
             typeof(OutAttribute).GetFullGenericTypeName(),
             typeof(InAttribute).GetFullGenericTypeName(),
             typeof(ParamArrayAttribute).GetFullGenericTypeName(),
@@ -24,7 +24,8 @@ namespace OoLunar.DocBot
             typeof(OptionalAttribute).GetFullGenericTypeName(),
             typeof(AsyncStateMachineAttribute).GetFullGenericTypeName(),
             typeof(IsReadOnlyAttribute).GetFullGenericTypeName(),
-        };
+            typeof(RequiredMemberAttribute).GetFullGenericTypeName(),
+        ];
 
         public static string TrimLength(this string value, int length) => value.Length > length ? $"{value[..(length - 1)].Trim()}…" : value;
 
@@ -168,7 +169,7 @@ namespace OoLunar.DocBot
 
                         if (isEnum)
                         {
-                            List<string> enumValues = new();
+                            List<string> enumValues = [];
                             Enum @enum = (Enum)Enum.Parse(enumType, argument.Value?.ToString() ?? "0");
                             foreach (object value in Enum.GetValues(enumType))
                             {
@@ -424,7 +425,23 @@ namespace OoLunar.DocBot
                 stringBuilder.Remove(stringBuilder.Length - 2, 2);
             }
 
-            stringBuilder.Append(" { }");
+            int propertyCount = 0;
+            foreach (PropertyInfo propertyInfo in type.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.Static))
+            {
+                stringBuilder.Append(propertyCount++ == 0 ? "\n{\n\t" : "\n\t");
+                stringBuilder.Append(propertyInfo.GetPropertyDeclarationSyntax());
+            }
+
+            if (propertyCount == 0)
+            {
+                stringBuilder.Append(';');
+            }
+            else
+            {
+                stringBuilder.Append('\n');
+                stringBuilder.Append('}');
+            }
+
             return stringBuilder.ToString();
         }
 
@@ -552,6 +569,11 @@ namespace OoLunar.DocBot
                     }
 
                     stringBuilder.Append(methodInfo.ReturnType.GetFullGenericTypeName());
+                    if (methodInfo.GetCustomAttribute<NullableAttribute>() is not null)
+                    {
+                        stringBuilder.Append('?');
+                    }
+
                     stringBuilder.Append(' ');
                     stringBuilder.Append(baseImplementation.DeclaringType!.GetFullGenericTypeName());
                     stringBuilder.Append('.');
@@ -566,6 +588,11 @@ namespace OoLunar.DocBot
                         stringBuilder.Append("async ");
                     }
                     stringBuilder.Append(methodInfo.ReturnType.GetFullGenericTypeName());
+                    if (methodInfo.GetCustomAttribute<NullableAttribute>() is not null)
+                    {
+                        stringBuilder.Append('?');
+                    }
+
                     stringBuilder.Append(' ');
                     stringBuilder.Append(methodInfo.Name);
                 }
@@ -690,6 +717,11 @@ namespace OoLunar.DocBot
                     stringBuilder.Append("abstract ");
                 }
 
+                if (propertyInfo.GetCustomAttribute<RequiredMemberAttribute>() is not null)
+                {
+                    stringBuilder.Append("required ");
+                }
+
                 if ((propertyInfo.GetMethod?.IsVirtual ?? false) || (propertyInfo.SetMethod?.IsVirtual ?? false))
                 {
                     stringBuilder.Append("virtual ");
@@ -703,6 +735,11 @@ namespace OoLunar.DocBot
 
             // Property type
             stringBuilder.Append(propertyInfo.PropertyType.GetFullGenericTypeName());
+            if (propertyInfo.GetCustomAttribute<NullableAttribute>() is not null)
+            {
+                stringBuilder.Append('?');
+            }
+
             stringBuilder.Append(' ');
 
             // Property name
@@ -746,7 +783,7 @@ namespace OoLunar.DocBot
             if (propertyInfo.GetCustomAttribute<DefaultValueAttribute>() is DefaultValueAttribute defaultValueAttribute)
             {
                 stringBuilder.Append(" = ");
-                stringBuilder.Append(defaultValueAttribute.Value.FormatUnknownObject(propertyInfo.PropertyType));
+                stringBuilder.Append(defaultValueAttribute.Value.FormatUnknownValue(propertyInfo.PropertyType));
                 stringBuilder.Append(';');
             }
 
@@ -790,6 +827,11 @@ namespace OoLunar.DocBot
 
             // Field type
             stringBuilder.Append(fieldInfo.FieldType.GetFullGenericTypeName());
+            if (fieldInfo.GetCustomAttribute<NullableAttribute>() is not null)
+            {
+                stringBuilder.Append('?');
+            }
+
             stringBuilder.Append(' ');
 
             // Field name
@@ -798,12 +840,12 @@ namespace OoLunar.DocBot
             if (fieldInfo.GetCustomAttribute<DefaultValueAttribute>() is DefaultValueAttribute defaultValueAttribute)
             {
                 stringBuilder.Append(" = ");
-                stringBuilder.Append(defaultValueAttribute.Value.FormatUnknownObject(fieldInfo.FieldType));
+                stringBuilder.Append(defaultValueAttribute.Value.FormatUnknownValue(fieldInfo.FieldType));
             }
             else if (fieldInfo.IsLiteral)
             {
                 stringBuilder.Append(" = ");
-                stringBuilder.Append(fieldInfo.GetRawConstantValue().FormatUnknownObject(fieldInfo.FieldType));
+                stringBuilder.Append(fieldInfo.GetRawConstantValue().FormatUnknownValue(fieldInfo.FieldType));
             }
 
             stringBuilder.Append(';');
@@ -945,7 +987,7 @@ namespace OoLunar.DocBot
             return stringBuilder.ToString();
         }
 
-        private static string FormatUnknownObject(this object? obj, Type? objType = null) => obj switch
+        private static string FormatUnknownValue(this object? obj, Type? objType = null) => obj switch
         {
             string @string => $"\"{@string}\"",
             null => "null",
