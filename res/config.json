@@ -1,10 +1,11 @@
 {
     "discord": {
-        "debug_guild_id": "",
-        "token": "",
-        "prefixes": [
-            ">>"
-        ]
+        "debug_guild_id": "guild id",
+        "token": "discord token",
+        "prefix": "d!"
+    },
+    "github": {
+        "token": "github token"
     },
     "logging": {
         "level": "Debug",
@@ -12,15 +13,24 @@
             "DSharpPlus": "Information"
         }
     },
+    "assembly_provider": "git",
+    "repository": {
+        "path": "file path",
+        "url": "git url"
+    },
+    "local_project": {
+        "path": "file path"
+    },
     "nuget": {
         "path": "packages",
         "packages": {
-            "DSharpPlus": "4.4.2",
-            "DSharpPlus.CommandsNext": "4.4.2",
-            "DSharpPlus.Interactivity": "4.4.2",
-            "DSharpPlus.VoiceNext": "4.4.2",
-            "DSharpPlus.SlashCommands": "4.4.2",
-            "DSharpPlus.Lavalink": "4.4.2"
+            "DSharpPlus": "version",
+            "DSharpPlus.Commands": "",
+            "DSharpPlus.CommandsNext": "",
+            "DSharpPlus.Interactivity": "",
+            "DSharpPlus.VoiceNext": "",
+            "DSharpPlus.SlashCommands": "",
+            "DSharpPlus.Lavalink": ""
         }
     }
 }
