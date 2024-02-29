@@ -95,7 +95,13 @@ namespace OoLunar.DocBot.Commands
                     continue;
                 }
 
-                choices.Add(member.DisplayName.TrimLength(100), member.GetHashCode().ToString(CultureInfo.InvariantCulture));
+                string identifier = member.DisplayName.TrimLength(100);
+                if (choices.ContainsKey(identifier))
+                {
+                    continue;
+                }
+
+                choices.Add(identifier, member.GetHashCode().ToString(CultureInfo.InvariantCulture));
                 if (choices.Count == 10)
                 {
                     break;
