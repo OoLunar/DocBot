@@ -94,14 +94,12 @@ namespace OoLunar.DocBot.Commands
                 {
                     continue;
                 }
-
-                string identifier = member.DisplayName.TrimLength(100);
-                if (choices.ContainsKey(identifier))
+                
+                if (!choices.TryAdd(member.DisplayName.TrimLength(100), member.GetHashCode().ToString(CultureInfo.InvariantCulture)))
                 {
                     continue;
                 }
-
-                choices.Add(identifier, member.GetHashCode().ToString(CultureInfo.InvariantCulture));
+                
                 if (choices.Count == 10)
                 {
                     break;
