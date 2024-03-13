@@ -15,6 +15,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OoLunar.DocBot.AssemblyProviders;
 using OoLunar.DocBot.Configuration;
+using OoLunar.DocBot.Events;
 using OoLunar.DocBot.GitHub;
 using Serilog;
 using Serilog.Events;
@@ -116,6 +117,13 @@ namespace OoLunar.DocBot
             serviceCollection.AddSingleton<DocumentationProvider>();
             serviceCollection.AddSingleton(serviceProvider =>
             {
+                DiscordEventManager eventManager = new(serviceProvider);
+                eventManager.GatherEventHandlers(typeof(Program).Assembly);
+                return eventManager;
+            });
+
+            serviceCollection.AddSingleton(serviceProvider =>
+            {
                 DocBotConfiguration docBotConfiguration = serviceProvider.GetRequiredService<DocBotConfiguration>();
                 if (docBotConfiguration.Discord is null || string.IsNullOrWhiteSpace(docBotConfiguration.Discord.Token))
                 {
@@ -143,6 +151,7 @@ namespace OoLunar.DocBot
             }
 
             DiscordShardedClient discordClient = serviceProvider.GetRequiredService<DiscordShardedClient>();
+            DiscordEventManager discordEventManager = serviceProvider.GetRequiredService<DiscordEventManager>();
             DocumentationProvider documentationProvider = serviceProvider.GetRequiredService<DocumentationProvider>();
             await documentationProvider.ReloadAsync();
 
@@ -168,6 +177,10 @@ namespace OoLunar.DocBot
                 await commandsExtension.AddProcessorsAsync(textCommandProcessor, new SlashCommandProcessor(), new UserCommandProcessor(), new MessageCommandProcessor());
             }
 
+            // Register event handlers
+            discordEventManager.RegisterEventHandlers(discordClient);
+
+            // Start the bot
             await discordClient.StartAsync();
             await Task.Delay(-1);
         }

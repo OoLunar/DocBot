@@ -10,8 +10,7 @@
             "args": [],
             "cwd": "${workspaceFolder}",
             "console": "internalConsole",
-            "stopAtEntry": false,
-            "envFile": "${workspaceFolder}/.env"
+            "stopAtEntry": false
         },
         {
             "name": ".NET Core Attach",
