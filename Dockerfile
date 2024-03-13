@@ -2,7 +2,7 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS build
 ARG VERSION=1.0.0
 WORKDIR /src
 
-COPY ./ /src
+COPY . .
 RUN apk add git \
     && git submodule update --init --recursive \
     && sed -i "s/<Version>.*<\/Version>/<Version>${VERSION}<\/Version>/" src/DocBot.csproj \
