@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text;
@@ -18,6 +19,7 @@ namespace OoLunar.DocBot.Events.EventHandlers
         private static partial Regex IssueRegex();
         private readonly string _issuesUrl;
         private readonly HttpClient _httpClient;
+        private readonly Dictionary<uint, string> _issueCache = [];
 
         public LinkIssueEventHandlers(DocBotConfiguration configuration, HttpClient httpClient)
         {
@@ -36,8 +38,13 @@ namespace OoLunar.DocBot.Events.EventHandlers
             List<string> issueLinks = [];
             foreach (Match match in IssueRegex().Matches(eventArgs.Message.Content))
             {
-                if (!uint.TryParse(match.Groups[1].ValueSpan, out uint issueNumber))
+                if (!uint.TryParse(match.Groups[1].ValueSpan, out uint issueNumber) || issueNumber == 0)
                 {
+                    continue;
+                }
+                else if (_issueCache.TryGetValue(issueNumber, out string? cachedLink))
+                {
+                    issueLinks.Add(cachedLink);
                     continue;
                 }
 
@@ -49,22 +56,20 @@ namespace OoLunar.DocBot.Events.EventHandlers
                 }
 
                 JsonDocument? json = await responseMessage.Content.ReadFromJsonAsync<JsonDocument>();
-                if (json is null || !json.RootElement.TryGetProperty("title", out JsonElement title) || !json.RootElement.TryGetProperty("user", out JsonElement user) || !user.TryGetProperty("login", out JsonElement login))
+                if (json is null || !json.RootElement.TryGetProperty("html_url", out JsonElement url) || !json.RootElement.TryGetProperty("title", out JsonElement title) || !json.RootElement.TryGetProperty("user", out JsonElement user) || !user.TryGetProperty("login", out JsonElement login))
                 {
                     continue;
                 }
 
-                if (json.RootElement.TryGetProperty("pull_request", out _))
-                {
-                    issueLinks.Add($"Pull Request #{issueNumber}: [{title.GetString()}](<{issueUrl}>) - {login.GetString()}");
-                }
-                else
-                {
-                    issueLinks.Add($"Issue #{issueNumber}: [{title.GetString()}](<{issueUrl}>) - {login.GetString()}");
-                }
+                string linkText = json.RootElement.TryGetProperty("pull_request", out _)
+                    ? $"Pull Request #{issueNumber}: [{title.GetString()}](<{url.GetString()}>) - {login.GetString()}"
+                    : $"Issue #{issueNumber}: [{title.GetString()}](<{url.GetString()}>) - {login.GetString()}";
+
+                issueLinks.Add(linkText);
+                _issueCache[issueNumber] = linkText;
             }
 
-            issueLinks.Sort();
+            issueLinks = issueLinks.Distinct().ToList();
             if (issueLinks.Count == 0)
             {
                 return;
@@ -76,12 +81,21 @@ namespace OoLunar.DocBot.Events.EventHandlers
             else
             {
                 StringBuilder builder = new();
-                foreach (string issueLink in issueLinks)
+                while (issueLinks.Count != 0)
                 {
-                    builder.AppendLine($"\\- {issueLink}");
-                }
+                    foreach (string issueLink in issueLinks)
+                    {
+                        if ((builder.Length + issueLink.Length + 3) > 2000)
+                        {
+                            break;
+                        }
 
-                await eventArgs.Message.RespondAsync(builder.ToString());
+                        builder.AppendLine($"\\- {issueLink}");
+                    }
+
+                    await eventArgs.Message.RespondAsync(builder.ToString());
+                    builder.Clear();
+                }
             }
         }
     }
