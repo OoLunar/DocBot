@@ -2,7 +2,8 @@
     "discord": {
         "DebugGuildId": 0,
         "Token": "My Discord token.",
-        "Prefix": "d!"
+        "Prefix": "d!",
+        "Repository": "OoLunar/DocBot"
     },
     "Logger": {
         "Level": "Debug",
