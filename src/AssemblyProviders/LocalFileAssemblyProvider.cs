@@ -11,7 +11,7 @@ namespace OoLunar.DocBot.AssemblyProviders
 {
     public sealed class LocalFileAssemblyProvider : IAssemblyProvider
     {
-        public string Name { get; init; } = "local_file";
+        public string Name { get; init; } = "LocalFile";
 
         private readonly ILogger<LocalFileAssemblyProvider> _logger;
         private readonly IReadOnlyList<string> _assemblyPaths;

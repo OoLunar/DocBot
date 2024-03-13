@@ -9,12 +9,13 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using OoLunar.DocBot.Configuration;
 
 namespace OoLunar.DocBot.AssemblyProviders
 {
     public sealed class LocalProjectAssemblyProvider : IAssemblyProvider
     {
-        public string Name { get; init; } = "local_project";
+        public string Name { get; init; } = "LocalProject";
 
         private readonly ILogger<LocalProjectAssemblyProvider> _logger;
         private readonly string _projectPath;
@@ -25,10 +26,10 @@ namespace OoLunar.DocBot.AssemblyProviders
             _projectPath = projectPath;
         }
 
-        public LocalProjectAssemblyProvider(IConfiguration configuration, ILogger<LocalProjectAssemblyProvider>? logger = null)
+        public LocalProjectAssemblyProvider(DocBotConfiguration configuration, ILogger<LocalProjectAssemblyProvider>? logger = null)
         {
             _logger = logger ?? NullLoggerFactory.Instance.CreateLogger<LocalProjectAssemblyProvider>();
-            _projectPath = configuration.GetValue("local_project:path", "src")!;
+            _projectPath = configuration.AssemblyProviders[Name].GetValue("path", "src")!;
         }
 
         public async ValueTask<IEnumerable<Assembly>> GetAssembliesAsync()

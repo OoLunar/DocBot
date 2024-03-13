@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using OoLunar.DocBot.Configuration;
 
 namespace OoLunar.DocBot.AssemblyProviders
 {
@@ -26,13 +27,13 @@ namespace OoLunar.DocBot.AssemblyProviders
 </Project>
 """;
 
-        public string Name { get; init; } = "nuget";
-        private readonly IConfiguration _configuration;
+        public string Name { get; init; } = "NuGet";
+        private readonly IConfigurationSection _configuration;
         private readonly ILogger<NugetAssemblyProvider> _logger;
 
-        public NugetAssemblyProvider(IConfiguration configuration, ILogger<NugetAssemblyProvider>? logger = null)
+        public NugetAssemblyProvider(DocBotConfiguration configuration, ILogger<NugetAssemblyProvider>? logger = null)
         {
-            _configuration = configuration;
+            _configuration = configuration.AssemblyProviders[Name];
             _logger = logger ?? NullLoggerFactory.Instance.CreateLogger<NugetAssemblyProvider>();
         }
 

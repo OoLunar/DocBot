@@ -8,18 +8,19 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using OoLunar.DocBot.Configuration;
 
 namespace OoLunar.DocBot.GitHub
 {
     public sealed class GitHubMetadataRetriever
     {
-        private readonly IConfiguration _configuration;
+        private readonly string? _githubToken;
         private readonly HttpClient _httpClient;
         private readonly ILogger<GitHubMetadataRetriever> _logger;
 
-        public GitHubMetadataRetriever(IConfiguration configuration, HttpClient httpClient, ILogger<GitHubMetadataRetriever>? logger = null)
+        public GitHubMetadataRetriever(DocBotConfiguration configuration, HttpClient httpClient, ILogger<GitHubMetadataRetriever>? logger = null)
         {
-            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+            _githubToken = configuration.AssemblyProviders["git"].GetValue<string>("token");
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? NullLogger<GitHubMetadataRetriever>.Instance;
         }
@@ -116,16 +117,14 @@ namespace OoLunar.DocBot.GitHub
 
         public async Task<Uri?> SearchCodeForMemberAsync(MemberInfo memberInfo, Uri? apiUrl = null)
         {
-            if (apiUrl is null)
+            if (string.IsNullOrWhiteSpace(_githubToken))
             {
-                _logger.LogError("GitHub API URL is not configured. Unable to use the GitHub Search Code endpoint.");
+                _logger.LogWarning("GitHub token is not configured. Unable to use the GitHub Search Code endpoint.");
                 return null;
             }
-
-            string? githubToken = _configuration.GetValue<string>("github:token");
-            if (githubToken is null)
+            else if (apiUrl is null)
             {
-                _logger.LogError("GitHub token is not configured. Unable to use the GitHub Search Code endpoint.");
+                _logger.LogError("GitHub API URL is not configured. Unable to use the GitHub Search Code endpoint.");
                 return null;
             }
 
@@ -133,7 +132,7 @@ namespace OoLunar.DocBot.GitHub
             _logger.LogTrace("Fetching GitHub URL for member: {MemberName}", memberInfo.GetFullName());
 
             using HttpRequestMessage request = new(HttpMethod.Get, apiUrl);
-            request.Headers.Add("Authorization", $"Bearer {githubToken}");
+            request.Headers.Add("Authorization", $"Bearer {_githubToken}");
             using HttpResponseMessage response = await _httpClient.SendAsync(request);
             if (!response.IsSuccessStatusCode)
             {

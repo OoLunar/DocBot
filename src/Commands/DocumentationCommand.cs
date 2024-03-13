@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
 using System.Threading.Tasks;
+using DSharpPlus.Commands;
 using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Commands.Processors.SlashCommands.Attributes;
 using DSharpPlus.Commands.Processors.TextCommands.Attributes;
@@ -81,7 +82,7 @@ namespace OoLunar.DocBot.Commands
             await context.EditResponseAsync(documentation.Content);
         }
 
-        public ValueTask<Dictionary<string, object>> AutoCompleteAsync(AutoCompleteContext context)
+        public ValueTask<IReadOnlyDictionary<string, object>> AutoCompleteAsync(AutoCompleteContext context)
         {
             string query = context.UserInput.ToString() ?? string.Empty;
             _logger.LogDebug("Querying documentation for: \"{Query}\"", query);
@@ -106,7 +107,7 @@ namespace OoLunar.DocBot.Commands
                 }
             }
 
-            return ValueTask.FromResult(choices);
+            return ValueTask.FromResult<IReadOnlyDictionary<string, object>>(choices);
         }
     }
 }

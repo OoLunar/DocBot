@@ -7,24 +7,25 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using OoLunar.DocBot.Configuration;
 
 namespace OoLunar.DocBot.AssemblyProviders
 {
     public sealed class GitRepositoryAssemblyProvider : IAssemblyProvider
     {
-        public string Name { get; init; } = "git";
+        public string Name { get; init; } = "Git";
 
         private readonly ILogger<GitRepositoryAssemblyProvider> _logger;
         private readonly string _repositoryPath;
         private readonly string _repositoryUrl;
         private readonly LocalProjectAssemblyProvider _localProjectAssemblyProvider;
 
-        public GitRepositoryAssemblyProvider(IConfiguration configuration, ILogger<GitRepositoryAssemblyProvider>? gitAssemblyProviderLogger = null, ILogger<LocalProjectAssemblyProvider>? localProjectAssemblyProviderLogger = null)
+        public GitRepositoryAssemblyProvider(DocBotConfiguration configuration, ILogger<GitRepositoryAssemblyProvider>? gitAssemblyProviderLogger = null, ILogger<LocalProjectAssemblyProvider>? localProjectAssemblyProviderLogger = null)
         {
             _logger = gitAssemblyProviderLogger ?? NullLoggerFactory.Instance.CreateLogger<GitRepositoryAssemblyProvider>();
-            _repositoryPath = configuration.GetValue("repository:path", "src")!;
+            _repositoryPath = configuration.AssemblyProviders[Name].GetValue("path", "src")!;
+            _repositoryUrl = configuration.AssemblyProviders[Name].GetValue<string>("url")!;
             _localProjectAssemblyProvider = new LocalProjectAssemblyProvider(_repositoryPath, localProjectAssemblyProviderLogger);
-            _repositoryUrl = configuration.GetValue<string>("repository:url")!;
             if (string.IsNullOrWhiteSpace(_repositoryUrl))
             {
                 throw new InvalidOperationException("Repository URL is required.");
