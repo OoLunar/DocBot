@@ -50,7 +50,7 @@ namespace OoLunar.DocBot.AssemblyProviders
 
         private async ValueTask CloneRepositoryAsync()
         {
-            ProcessStartInfo startInfo = new("git", $"clone {_repositoryUrl} {_repositoryPath}")
+            ProcessStartInfo startInfo = new("git", $"clone \"{_repositoryUrl}\" \"{_repositoryPath}\"")
             {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -62,6 +62,7 @@ namespace OoLunar.DocBot.AssemblyProviders
             await process.WaitForExitAsync();
             if (process.ExitCode != 0)
             {
+                _logger.LogCritical("Failed to clone repository: {Error}", await process.StandardError.ReadToEndAsync());
                 throw new InvalidOperationException("Failed to clone repository.");
             }
         }
@@ -81,6 +82,7 @@ namespace OoLunar.DocBot.AssemblyProviders
             await process.WaitForExitAsync();
             if (process.ExitCode != 0)
             {
+                _logger.LogCritical("Failed to pull repository: {Error}", await process.StandardError.ReadToEndAsync());
                 throw new InvalidOperationException("Failed to pull repository.");
             }
         }
