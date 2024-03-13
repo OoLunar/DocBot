@@ -36,7 +36,7 @@ namespace OoLunar.DocBot.Events.EventHandlers
             List<string> issueLinks = [];
             foreach (Match match in IssueRegex().Matches(eventArgs.Message.Content))
             {
-                if (!int.TryParse(match.Groups[1].Value, out int issueNumber))
+                if (!uint.TryParse(match.Groups[1].ValueSpan, out uint issueNumber))
                 {
                     continue;
                 }
