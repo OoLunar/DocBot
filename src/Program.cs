@@ -159,7 +159,7 @@ namespace OoLunar.DocBot
             IReadOnlyDictionary<int, CommandsExtension> commandsExtensions = await discordClient.UseCommandsAsync(new CommandsConfiguration()
             {
                 ServiceProvider = serviceProvider,
-                DebugGuildId = docBotConfiguration.Discord!.DebugGuildId == 0 ? null : docBotConfiguration.Discord.DebugGuildId,
+                DebugGuildId = docBotConfiguration.Discord.DebugGuildId
             });
 
             // Iterate through each Discord shard
@@ -171,7 +171,8 @@ namespace OoLunar.DocBot
                 // Add all processors
                 TextCommandProcessor textCommandProcessor = new(new()
                 {
-                    PrefixResolver = new DefaultPrefixResolver(docBotConfiguration.Discord.Prefix).ResolvePrefixAsync
+                    PrefixResolver = new DefaultPrefixResolver(docBotConfiguration.Discord.Prefix).ResolvePrefixAsync,
+                    IgnoreBots = false
                 });
 
                 await commandsExtension.AddProcessorsAsync(textCommandProcessor, new SlashCommandProcessor(), new UserCommandProcessor(), new MessageCommandProcessor());
