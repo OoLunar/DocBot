@@ -107,14 +107,14 @@ namespace OoLunar.DocBot
                         }
 
                         StringBuilder stringBuilder = new("## ");
-                        stringBuilder.Append(name);
+                        stringBuilder.Append(Formatter.Sanitize(name));
                         stringBuilder.AppendLine();
                         stringBuilder.AppendLine("### Summary");
-                        stringBuilder.AppendLine(summary);
+                        stringBuilder.AppendLine(Formatter.Sanitize(summary));
                         if (remarks is not null)
                         {
                             stringBuilder.AppendLine("### Remarks");
-                            stringBuilder.AppendLine(remarks);
+                            stringBuilder.AppendLine(Formatter.Sanitize(remarks));
                         }
 
                         stringBuilder.AppendLine("### Declaration");
