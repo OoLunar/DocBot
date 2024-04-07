@@ -83,6 +83,7 @@ namespace OoLunar.DocBot.Events.EventHandlers
                 StringBuilder builder = new();
                 while (issueLinks.Count != 0)
                 {
+                    int issuesListed = 0;
                     foreach (string issueLink in issueLinks)
                     {
                         if ((builder.Length + issueLink.Length + 3) > 2000)
@@ -91,10 +92,12 @@ namespace OoLunar.DocBot.Events.EventHandlers
                         }
 
                         builder.AppendLine($"\\- {issueLink}");
+                        issuesListed++;
                     }
 
                     await eventArgs.Message.RespondAsync(builder.ToString());
                     builder.Clear();
+                    issueLinks.RemoveRange(issuesListed);
                 }
             }
         }
