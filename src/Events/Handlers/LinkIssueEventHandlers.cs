@@ -97,7 +97,7 @@ namespace OoLunar.DocBot.Events.EventHandlers
 
                     await eventArgs.Message.RespondAsync(builder.ToString());
                     builder.Clear();
-                    issueLinks.RemoveRange(issuesListed);
+                    issueLinks.RemoveRange(0, issuesListed);
                 }
             }
         }
