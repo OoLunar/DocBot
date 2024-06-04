@@ -1,0 +1,11 @@
+version: "3.9"
+
+services:
+  docbot:
+    build: .
+    #image: ghcr.io/oolunar/docbot:latest
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./logs:/src/logs
+      - ./res/config.json:/src/config.json

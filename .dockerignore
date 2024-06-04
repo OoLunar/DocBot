@@ -1,0 +1,6 @@
+.editorconfig
+.github/
+.gitignore
+.vscode/
+res/
+tools/

@@ -1,0 +1,36 @@
+{
+    "discord": {
+        "DebugGuildId": 0,
+        "Token": "My Discord token.",
+        "Prefix": "d!",
+        "Repository": "OoLunar/DocBot"
+    },
+    "Logger": {
+        "Level": "Debug",
+        "Overrides": {
+            "DSharpPlus": "Information",
+            "DSharpPlus.Commands": "Debug"
+        }
+    },
+    "AssemblyProviderName": "git",
+    "AssemblyProviders": {
+        "Git": {
+            "Path": "libs/DocBot",
+            "Url": "https://github.com/OoLunar/DocBot.git",
+            "Token": "My GitHub token."
+        },
+        "LocalFile": {
+            "Path": "libs/DocBot/src/bin/Debug/net8.0/DocBot.dll"
+        },
+        "LocalProject": {
+            "Path": "libs/DocBot"
+        },
+        "NuGet": {
+            "Path": "packages",
+            "Packages": {
+                "DSharpPlus": "",
+                "DSharpPlus.Commands": "5.0.0"
+            }
+        }
+    }
+}
