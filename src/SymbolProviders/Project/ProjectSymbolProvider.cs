@@ -56,9 +56,9 @@ namespace OoLunar.DocBot.SymbolProviders.Projects
                 // Find all members inside of namespace declarations.
                 foreach (SyntaxNode syntaxNode in syntaxRoot.DescendantNodes())
                 {
-                    if (syntaxNode is BaseNamespaceDeclarationSyntax)
+                    if (syntaxNode is BaseNamespaceDeclarationSyntax baseNamespaceDeclarationSyntax)
                     {
-                        NamespaceDefinition namespaceInfo = ParseNamespaceNode(syntaxNode);
+                        NamespaceDefinition namespaceInfo = ParseNamespaceNode(baseNamespaceDeclarationSyntax);
                         _objectDefinitions[namespaceInfo.Name] = namespaceInfo;
                     }
                 }
@@ -67,11 +67,11 @@ namespace OoLunar.DocBot.SymbolProviders.Projects
             _logger.LogInformation("Loaded {ObjectCount:N0} objects from project {ProjectName}.", _objectDefinitions.Count, project.Name);
         }
 
-        protected NamespaceDefinition ParseNamespaceNode(SyntaxNode namespaceDeclaration)
+        protected NamespaceDefinition ParseNamespaceNode(BaseNamespaceDeclarationSyntax namespaceDeclaration)
         {
             NamespaceDefinition namespaceInfo;
 
-            string namespaceName = namespaceDeclaration.ToString();
+            string namespaceName = namespaceDeclaration.Name.ToString();
             if (_objectDefinitions.TryGetValue(namespaceName, out MemberDefinition? memberDefinition))
             {
                 if (memberDefinition is not NamespaceDefinition parsedNamespaceInfo)
@@ -90,12 +90,9 @@ namespace OoLunar.DocBot.SymbolProviders.Projects
             {
                 MemberDefinition? memberInfo = subNode switch
                 {
-                    ClassDeclarationSyntax classDeclaration => ParseClassNode(classDeclaration),
+                    BaseNamespaceDeclarationSyntax subNamespaceDeclaration => ParseNamespaceNode(subNamespaceDeclaration),
+                    TypeDeclarationSyntax typeDeclarationSyntax => ParseDeclarationNode(typeDeclarationSyntax),
                     EnumDeclarationSyntax enumDeclaration => ParseEnumNode(enumDeclaration),
-                    //InterfaceDeclarationSyntax interfaceDeclaration => ParseInterfaceNode(interfaceDeclaration),
-                    //NamespaceDeclarationSyntax subNamespaceDeclaration => ParseNamespaceNode(subNamespaceDeclaration),
-                    //RecordDeclarationSyntax recordDeclaration => ParseRecordNode(recordDeclaration),
-                    //StructDeclarationSyntax structDeclaration => ParseStructNode(structDeclaration),
                     //DelegateDeclarationSyntax delegateDeclaration => ParseDelegateNode(delegateDeclaration),
                     _ => null
                 };
@@ -109,7 +106,7 @@ namespace OoLunar.DocBot.SymbolProviders.Projects
             return namespaceInfo;
         }
 
-        protected ClassDefinition ParseClassNode(ClassDeclarationSyntax classDeclaration)
+        protected ClassDefinition ParseDeclarationNode(TypeDeclarationSyntax classDeclaration)
         {
             ClassDefinition classInfo;
             if (_objectDefinitions.TryGetValue(classDeclaration.Identifier.Text, out MemberDefinition? memberInfo))
@@ -150,27 +147,6 @@ namespace OoLunar.DocBot.SymbolProviders.Projects
             }
 
             return enumInfo;
-        }
-
-        protected StructDefinition ParseStructNode(StructDeclarationSyntax structDeclaration)
-        {
-            StructDefinition structInfo;
-            if (_objectDefinitions.TryGetValue(structDeclaration.Identifier.Text, out MemberDefinition? memberInfo))
-            {
-                if (memberInfo is not StructDefinition parsedStructInfo)
-                {
-                    throw new InvalidOperationException($"Expected {structDeclaration.Identifier.Text} to be a {nameof(StructDefinition)}, instead found {memberInfo.GetType().Name}");
-                }
-
-                structInfo = parsedStructInfo;
-            }
-            else
-            {
-                structInfo = new StructDefinition(structDeclaration.Identifier.Text, structDeclaration.WithMembers(default).WithOpenBraceToken(default).WithCloseBraceToken(default).WithSemicolonToken(default).ToString());
-                _objectDefinitions.Add(structDeclaration.Identifier.Text, structInfo);
-            }
-
-            return structInfo;
         }
     }
 }

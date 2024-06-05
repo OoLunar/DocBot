@@ -36,9 +36,9 @@ namespace OoLunar.DocBot.SymbolProviders.Solutions
                     // Find all members inside of namespace declarations.
                     foreach (SyntaxNode syntaxNode in syntaxRoot.DescendantNodes())
                     {
-                        if (syntaxNode is BaseNamespaceDeclarationSyntax)
+                        if (syntaxNode is BaseNamespaceDeclarationSyntax baseNamespaceDeclarationSyntax)
                         {
-                            NamespaceDefinition namespaceInfo = ParseNamespaceNode(syntaxNode);
+                            NamespaceDefinition namespaceInfo = ParseNamespaceNode(baseNamespaceDeclarationSyntax);
                             _objectDefinitions[namespaceInfo.Name] = namespaceInfo;
                         }
                     }
