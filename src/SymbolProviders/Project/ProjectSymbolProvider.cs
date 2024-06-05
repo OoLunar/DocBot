@@ -91,7 +91,7 @@ namespace OoLunar.DocBot.SymbolProviders.Projects
                 MemberDefinition? memberInfo = subNode switch
                 {
                     ClassDeclarationSyntax classDeclaration => ParseClassNode(classDeclaration),
-                    //EnumDeclarationSyntax enumDeclaration => ParseEnumNode(enumDeclaration),
+                    EnumDeclarationSyntax enumDeclaration => ParseEnumNode(enumDeclaration),
                     //InterfaceDeclarationSyntax interfaceDeclaration => ParseInterfaceNode(interfaceDeclaration),
                     //NamespaceDeclarationSyntax subNamespaceDeclaration => ParseNamespaceNode(subNamespaceDeclaration),
                     //RecordDeclarationSyntax recordDeclaration => ParseRecordNode(recordDeclaration),
@@ -129,6 +129,27 @@ namespace OoLunar.DocBot.SymbolProviders.Projects
             }
 
             return classInfo;
+        }
+
+        protected EnumDefinition ParseEnumNode(EnumDeclarationSyntax enumDeclaration)
+        {
+            EnumDefinition enumInfo;
+            if (_objectDefinitions.TryGetValue(enumDeclaration.Identifier.Text, out MemberDefinition? memberInfo))
+            {
+                if (memberInfo is not EnumDefinition parsedEnumInfo)
+                {
+                    throw new InvalidOperationException($"Expected {enumDeclaration.Identifier.Text} to be a {nameof(EnumDefinition)}, instead found {memberInfo.GetType().Name}");
+                }
+
+                enumInfo = parsedEnumInfo;
+            }
+            else
+            {
+                enumInfo = new EnumDefinition(enumDeclaration.Identifier.Text, enumDeclaration.WithMembers(default).WithOpenBraceToken(default).WithCloseBraceToken(default).WithSemicolonToken(default).ToString());
+                _objectDefinitions.Add(enumDeclaration.Identifier.Text, enumInfo);
+            }
+
+            return enumInfo;
         }
     }
 }
