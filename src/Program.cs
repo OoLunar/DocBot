@@ -10,6 +10,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OoLunar.DocBot.Configuration;
+using OoLunar.DocBot.SymbolProviders;
+using OoLunar.DocBot.SymbolProviders.Projects;
 using Serilog;
 using Serilog.Events;
 using Serilog.Sinks.SystemConsole.Themes;
@@ -22,7 +24,7 @@ namespace OoLunar.DocBot
         public static async Task Main(string[] args)
         {
             IServiceCollection services = new ServiceCollection();
-            services.AddSingleton(serviceProvider =>
+            services.AddSingleton<IConfiguration>(serviceProvider =>
             {
                 ConfigurationBuilder configurationBuilder = new();
                 configurationBuilder.Sources.Clear();
@@ -33,7 +35,12 @@ namespace OoLunar.DocBot
                 configurationBuilder.AddEnvironmentVariables("DocBot__");
                 configurationBuilder.AddCommandLine(args);
 
-                IConfiguration configuration = configurationBuilder.Build();
+                return configurationBuilder.Build();
+            });
+
+            services.AddSingleton(serviceProvider =>
+            {
+                IConfiguration configuration = serviceProvider.GetRequiredService<IConfiguration>();
                 DocBotConfiguration? docBot = configuration.Get<DocBotConfiguration>();
                 if (docBot is null)
                 {
@@ -76,6 +83,18 @@ namespace OoLunar.DocBot
                 logging.AddSerilog(serilogLoggerConfiguration.CreateLogger());
             });
 
+            services.AddSingleton<ISymbolProvider>((serviceProvider) =>
+            {
+                DocBotConfiguration docBot = serviceProvider.GetRequiredService<DocBotConfiguration>();
+                if (string.IsNullOrWhiteSpace(docBot.SelectedSymbolProvider))
+                {
+                    serviceProvider.GetRequiredService<ILogger<Program>>().LogCritical("No symbol provider selected! Exiting...");
+                    Environment.Exit(1);
+                }
+
+                return new ProjectSymbolProvider(serviceProvider.GetRequiredService<IConfiguration>().GetSection(docBot.SelectedSymbolProvider));
+            });
+
             services.AddSingleton(serviceProvider =>
             {
                 DocBotConfiguration docBot = serviceProvider.GetRequiredService<DocBotConfiguration>();
@@ -94,6 +113,8 @@ namespace OoLunar.DocBot
             IServiceProvider serviceProvider = services.BuildServiceProvider();
             DocBotConfiguration docBot = serviceProvider.GetRequiredService<DocBotConfiguration>();
             DiscordClient discordClient = serviceProvider.GetRequiredService<DiscordClient>();
+            ISymbolProvider symbolProvider = discordClient.ServiceProvider.GetRequiredService<ISymbolProvider>();
+            await symbolProvider.LoadAsync();
 
             // Register extensions here since these involve asynchronous operations
             CommandsExtension commandsExtension = discordClient.UseCommands(new CommandsConfiguration()
