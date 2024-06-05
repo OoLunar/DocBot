@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.MSBuild;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using OoLunar.DocBot.MemberDefinitions;
 
 namespace OoLunar.DocBot.SymbolProviders.Projects
@@ -15,11 +16,13 @@ namespace OoLunar.DocBot.SymbolProviders.Projects
     {
         public string ConfigurationSectionName => "Project";
 
-        private readonly ProjectSymbolProviderConfiguration _configuration;
-        private readonly Dictionary<string, MemberDefinition> _objectDefinitions = [];
+        protected readonly ProjectSymbolProviderConfiguration _configuration;
+        protected readonly Dictionary<string, MemberDefinition> _objectDefinitions = [];
+        protected readonly ILogger<ProjectSymbolProvider> _logger;
 
-        public ProjectSymbolProvider(IConfigurationSection configurationSection)
+        public ProjectSymbolProvider(IConfigurationSection configurationSection, ILogger<ProjectSymbolProvider> logger)
         {
+            _logger = logger;
             _configuration = configurationSection.Get<ProjectSymbolProviderConfiguration>()!;
             if (_configuration is null)
             {
@@ -37,9 +40,11 @@ namespace OoLunar.DocBot.SymbolProviders.Projects
 
         public string? GetDocumentation(string query) => _objectDefinitions.TryGetValue(query, out MemberDefinition? memberDefinition) ? Formatter.BlockCode(memberDefinition.Declaration, "cs") : null;
 
-        public async ValueTask LoadAsync()
+        public virtual async ValueTask LoadAsync()
         {
             Project project = await MSBuildWorkspace.Create().OpenProjectAsync(_configuration.Path);
+
+            _logger.LogInformation("Loading project {ProjectName} with {DocumentCount:N0} documents...", project.Name, project.DocumentIds.Count);
             foreach (Document document in project.Documents)
             {
                 // We will not support scripting at this time.
@@ -58,6 +63,8 @@ namespace OoLunar.DocBot.SymbolProviders.Projects
                     }
                 }
             }
+
+            _logger.LogInformation("Loaded {ObjectCount:N0} objects from project {ProjectName}.", _objectDefinitions.Count, project.Name);
         }
 
         protected NamespaceDefinition ParseNamespaceNode(SyntaxNode namespaceDeclaration)
@@ -95,7 +102,7 @@ namespace OoLunar.DocBot.SymbolProviders.Projects
 
                 if (memberInfo is not null)
                 {
-                    namespaceInfo.AddMember(memberInfo);
+                    namespaceInfo.SetMember(memberInfo);
                 }
             }
 

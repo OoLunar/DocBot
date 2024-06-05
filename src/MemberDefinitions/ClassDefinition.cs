@@ -22,12 +22,6 @@ namespace OoLunar.DocBot.MemberDefinitions
             }
         }
 
-        public void AddMember(MemberDefinition member)
-        {
-            if (member is not null)
-            {
-                _members.Add(member.Name, member);
-            }
-        }
+        public void SetMember(MemberDefinition member) => _members[member.Name] = member;
     }
 }

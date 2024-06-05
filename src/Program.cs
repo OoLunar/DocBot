@@ -12,6 +12,7 @@ using Microsoft.Extensions.Logging;
 using OoLunar.DocBot.Configuration;
 using OoLunar.DocBot.SymbolProviders;
 using OoLunar.DocBot.SymbolProviders.Projects;
+using OoLunar.DocBot.SymbolProviders.Solutions;
 using Serilog;
 using Serilog.Events;
 using Serilog.Sinks.SystemConsole.Themes;
@@ -92,7 +93,13 @@ namespace OoLunar.DocBot
                     Environment.Exit(1);
                 }
 
-                return new ProjectSymbolProvider(serviceProvider.GetRequiredService<IConfiguration>().GetSection(docBot.SelectedSymbolProvider));
+                IConfiguration configuration = serviceProvider.GetRequiredService<IConfiguration>();
+                return docBot.SelectedSymbolProvider.ToLowerInvariant() switch
+                {
+                    "project" => ActivatorUtilities.CreateInstance<ProjectSymbolProvider>(serviceProvider, configuration.GetSection(docBot.SelectedSymbolProvider)),
+                    "solution" => ActivatorUtilities.CreateInstance<SolutionSymbolProvider>(serviceProvider, configuration.GetSection(docBot.SelectedSymbolProvider)),
+                    _ => throw new InvalidOperationException($"Unknown symbol provider {docBot.SelectedSymbolProvider}"),
+                };
             });
 
             services.AddSingleton(serviceProvider =>

@@ -9,6 +9,6 @@ namespace OoLunar.DocBot.MemberDefinitions
 
         public NamespaceDefinition(string name, string fullspan) : base(name, fullspan) { }
 
-        public void AddMember(MemberDefinition member) => _members.Add(member.Name, member);
+        public void SetMember(MemberDefinition member) => _members[member.Name] = member;
     }
 }
