@@ -106,25 +106,44 @@ namespace OoLunar.DocBot.SymbolProviders.Projects
             return namespaceInfo;
         }
 
-        protected TypeDefinition ParseDeclarationNode(TypeDeclarationSyntax classDeclaration)
+        protected TypeDefinition ParseDeclarationNode(TypeDeclarationSyntax typeDeclaration)
         {
-            TypeDefinition classInfo;
-            if (_objectDefinitions.TryGetValue(classDeclaration.Identifier.Text, out MemberDefinition? memberInfo))
+            string typeName = typeDeclaration.WithMembers(default)
+                .WithAttributeLists(default)
+                .WithBaseList(default)
+                .WithCloseBraceToken(default)
+                .WithConstraintClauses(default)
+                .WithMembers(default)
+                .WithModifiers(default)
+                .WithOpenBraceToken(default)
+                .WithoutAnnotations()
+                .WithoutTrivia()
+                .WithParameterList(default)
+                .WithSemicolonToken(default)
+                .ToString()
+                .Replace("class", "")
+                .Replace("struct", "")
+                .Replace("record", "")
+                .Replace("interface", "")
+                .Trim();
+
+            TypeDefinition typeDefinition;
+            if (_objectDefinitions.TryGetValue(typeName, out MemberDefinition? memberInfo))
             {
                 if (memberInfo is not TypeDefinition parsedClassInfo)
                 {
-                    throw new InvalidOperationException($"Expected {classDeclaration.Identifier.Text} to be a {nameof(TypeDefinition)}, instead found {memberInfo.GetType().Name}");
+                    throw new InvalidOperationException($"Expected {typeName} to be a {nameof(TypeDefinition)}, instead found {memberInfo.GetType().Name}");
                 }
 
-                classInfo = parsedClassInfo;
+                typeDefinition = parsedClassInfo;
             }
             else
             {
-                classInfo = new TypeDefinition(classDeclaration.Identifier.Text, classDeclaration.WithMembers(default).WithOpenBraceToken(default).WithCloseBraceToken(default).WithSemicolonToken(default).ToString());
-                _objectDefinitions.Add(classDeclaration.Identifier.Text, classInfo);
+                typeDefinition = new TypeDefinition(typeName, typeDeclaration.WithMembers(default).WithOpenBraceToken(default).WithCloseBraceToken(default).WithSemicolonToken(default).ToString());
+                _objectDefinitions.Add(typeName, typeDefinition);
             }
 
-            return classInfo;
+            return typeDefinition;
         }
 
         protected EnumDefinition ParseEnumNode(EnumDeclarationSyntax enumDeclaration)
