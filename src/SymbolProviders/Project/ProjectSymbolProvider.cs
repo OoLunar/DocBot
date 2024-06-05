@@ -151,5 +151,26 @@ namespace OoLunar.DocBot.SymbolProviders.Projects
 
             return enumInfo;
         }
+
+        protected StructDefinition ParseStructNode(StructDeclarationSyntax structDeclaration)
+        {
+            StructDefinition structInfo;
+            if (_objectDefinitions.TryGetValue(structDeclaration.Identifier.Text, out MemberDefinition? memberInfo))
+            {
+                if (memberInfo is not StructDefinition parsedStructInfo)
+                {
+                    throw new InvalidOperationException($"Expected {structDeclaration.Identifier.Text} to be a {nameof(StructDefinition)}, instead found {memberInfo.GetType().Name}");
+                }
+
+                structInfo = parsedStructInfo;
+            }
+            else
+            {
+                structInfo = new StructDefinition(structDeclaration.Identifier.Text, structDeclaration.WithMembers(default).WithOpenBraceToken(default).WithCloseBraceToken(default).WithSemicolonToken(default).ToString());
+                _objectDefinitions.Add(structDeclaration.Identifier.Text, structInfo);
+            }
+
+            return structInfo;
+        }
     }
 }
