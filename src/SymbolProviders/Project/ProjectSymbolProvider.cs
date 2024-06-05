@@ -106,22 +106,21 @@ namespace OoLunar.DocBot.SymbolProviders.Projects
             return namespaceInfo;
         }
 
-        protected ClassDefinition ParseDeclarationNode(TypeDeclarationSyntax classDeclaration)
+        protected TypeDefinition ParseDeclarationNode(TypeDeclarationSyntax classDeclaration)
         {
-            ClassDefinition classInfo;
+            TypeDefinition classInfo;
             if (_objectDefinitions.TryGetValue(classDeclaration.Identifier.Text, out MemberDefinition? memberInfo))
             {
-                if (memberInfo is not ClassDefinition parsedClassInfo)
+                if (memberInfo is not TypeDefinition parsedClassInfo)
                 {
-                    throw new InvalidOperationException($"Expected {classDeclaration.Identifier.Text} to be a {nameof(ClassDefinition)}, instead found {memberInfo.GetType().Name}");
+                    throw new InvalidOperationException($"Expected {classDeclaration.Identifier.Text} to be a {nameof(TypeDefinition)}, instead found {memberInfo.GetType().Name}");
                 }
 
                 classInfo = parsedClassInfo;
-                classInfo.UpdateMetadata(classDeclaration.GetText().ToString());
             }
             else
             {
-                classInfo = new ClassDefinition(classDeclaration.Identifier.Text, classDeclaration.WithMembers(default).WithOpenBraceToken(default).WithCloseBraceToken(default).WithSemicolonToken(default).ToString());
+                classInfo = new TypeDefinition(classDeclaration.Identifier.Text, classDeclaration.WithMembers(default).WithOpenBraceToken(default).WithCloseBraceToken(default).WithSemicolonToken(default).ToString());
                 _objectDefinitions.Add(classDeclaration.Identifier.Text, classInfo);
             }
 
