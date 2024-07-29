@@ -1,13 +1,12 @@
 using System;
 using System.ComponentModel;
 using System.Threading.Tasks;
-using DSharpPlus;
 using DSharpPlus.Commands;
 using DSharpPlus.Commands.ContextChecks;
-using DSharpPlus.Commands.Processors.SlashCommands.Attributes;
-using DSharpPlus.Commands.Processors.TextCommands.Attributes;
+using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Commands.Trees;
-using DSharpPlus.Commands.Trees.Attributes;
+using DSharpPlus.Commands.Trees.Metadata;
+using DSharpPlus.Entities;
 
 namespace OoLunar.DocBot.Commands
 {
@@ -17,7 +16,7 @@ namespace OoLunar.DocBot.Commands
 
         public ReloadCommand(DocumentationProvider documentationProvider) => _documentationProvider = documentationProvider ?? throw new ArgumentNullException(nameof(documentationProvider));
 
-        [Command("reload"), TextAlias("restart"), Description("Reloads the bot documentation"), RequireApplicationOwner, SlashCommandTypes(ApplicationCommandType.SlashCommand)]
+        [Command("reload"), TextAlias("restart"), Description("Reloads the bot documentation"), RequireApplicationOwner, SlashCommandTypes(DiscordApplicationCommandType.SlashCommand)]
         public async ValueTask ExecuteAsync(CommandContext context)
         {
             await context.DeferResponseAsync();

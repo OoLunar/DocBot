@@ -1,15 +1,12 @@
 using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.Net.Http;
 using System.Threading.Tasks;
 using DSharpPlus;
 using DSharpPlus.Commands;
-using DSharpPlus.Commands.Processors.MessageCommands;
 using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Commands.Processors.TextCommands;
 using DSharpPlus.Commands.Processors.TextCommands.Parsing;
-using DSharpPlus.Commands.Processors.UserCommands;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -20,7 +17,6 @@ using OoLunar.DocBot.GitHub;
 using Serilog;
 using Serilog.Events;
 using Serilog.Sinks.SystemConsole.Themes;
-using DSharpPlusDiscordConfiguration = DSharpPlus.DiscordConfiguration;
 using SerilogLoggerConfiguration = Serilog.LoggerConfiguration;
 
 namespace OoLunar.DocBot
@@ -131,14 +127,9 @@ namespace OoLunar.DocBot
                     Environment.Exit(1);
                 }
 
-                DiscordShardedClient discordClient = new(new DSharpPlusDiscordConfiguration
-                {
-                    Token = docBotConfiguration.Discord.Token,
-                    Intents = TextCommandProcessor.RequiredIntents | SlashCommandProcessor.RequiredIntents | DiscordIntents.GuildVoiceStates | DiscordIntents.MessageContents,
-                    LoggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>(),
-                });
-
-                return discordClient;
+                DiscordClientBuilder clientBuilder = DiscordClientBuilder.CreateDefault(docBotConfiguration.Discord.Token, TextCommandProcessor.RequiredIntents | SlashCommandProcessor.RequiredIntents | DiscordIntents.MessageContents, serviceCollection);
+                clientBuilder.DisableDefaultLogging();
+                return clientBuilder.Build();
             });
 
             IServiceProvider serviceProvider = serviceCollection.BuildServiceProvider();
@@ -150,39 +141,34 @@ namespace OoLunar.DocBot
                 Environment.Exit(1);
             }
 
-            DiscordShardedClient discordClient = serviceProvider.GetRequiredService<DiscordShardedClient>();
+            DiscordClient discordClient = serviceProvider.GetRequiredService<DiscordClient>();
             DiscordEventManager discordEventManager = serviceProvider.GetRequiredService<DiscordEventManager>();
-            DocumentationProvider documentationProvider = serviceProvider.GetRequiredService<DocumentationProvider>();
+            DocumentationProvider documentationProvider = discordClient.ServiceProvider.GetRequiredService<DocumentationProvider>();
             await documentationProvider.ReloadAsync();
 
             // Register extensions here since these involve asynchronous operations
-            IReadOnlyDictionary<int, CommandsExtension> commandsExtensions = await discordClient.UseCommandsAsync(new CommandsConfiguration()
+            CommandsExtension commandsExtension = discordClient.UseCommands(new CommandsConfiguration()
             {
-                ServiceProvider = serviceProvider,
                 DebugGuildId = docBotConfiguration.Discord.DebugGuildId
             });
 
-            // Iterate through each Discord shard
-            foreach (CommandsExtension commandsExtension in commandsExtensions.Values)
+            // Add all commands by scanning the current assembly
+            commandsExtension.AddCommands(typeof(Program).Assembly);
+
+            // Add all processors
+            TextCommandProcessor textCommandProcessor = new(new()
             {
-                // Add all commands by scanning the current assembly
-                commandsExtension.AddCommands(typeof(Program).Assembly);
+                PrefixResolver = new DefaultPrefixResolver(true, docBotConfiguration.Discord.Prefix).ResolvePrefixAsync,
+                IgnoreBots = false
+            });
 
-                // Add all processors
-                TextCommandProcessor textCommandProcessor = new(new()
-                {
-                    PrefixResolver = new DefaultPrefixResolver(docBotConfiguration.Discord.Prefix).ResolvePrefixAsync,
-                    IgnoreBots = false
-                });
-
-                await commandsExtension.AddProcessorsAsync(textCommandProcessor, new SlashCommandProcessor(), new UserCommandProcessor(), new MessageCommandProcessor());
-            }
+            await commandsExtension.AddProcessorAsync(textCommandProcessor);
 
             // Register event handlers
             discordEventManager.RegisterEventHandlers(discordClient);
 
             // Start the bot
-            await discordClient.StartAsync();
+            await discordClient.ConnectAsync();
             await Task.Delay(-1);
         }
     }

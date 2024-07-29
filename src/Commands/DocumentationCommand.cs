@@ -2,13 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
+using System.Linq;
 using System.Threading.Tasks;
 using DSharpPlus.Commands;
+using DSharpPlus.Commands.ArgumentModifiers;
 using DSharpPlus.Commands.Processors.SlashCommands;
-using DSharpPlus.Commands.Processors.SlashCommands.Attributes;
-using DSharpPlus.Commands.Processors.TextCommands.Attributes;
+using DSharpPlus.Commands.Processors.SlashCommands.ArgumentModifiers;
 using DSharpPlus.Commands.Trees;
-using DSharpPlus.Commands.Trees.Attributes;
+using DSharpPlus.Commands.Trees.Metadata;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -26,13 +27,13 @@ namespace OoLunar.DocBot.Commands
         }
 
         [Command("documentation"), TextAlias("doc", "docs"), Description("Retrieves documentation for a given type or member.")]
-        public async Task GetDocumentationAsync(CommandContext context, [Description("Which type or member to grab documentation upon."), SlashAutoCompleteProvider<DocumentationCommand>, RemainingText] string query)
+        public async Task GetDocumentationAsync(CommandContext context, [Description("Which type or member to grab documentation upon."), SlashAutoCompleteProvider<DocumentationCommand>, RemainingText] string? query = null)
         {
             DocumentationMember? documentation = null;
             if (string.IsNullOrWhiteSpace(query))
             {
-                _logger.LogDebug("No query provided.");
-                await context.RespondAsync("No query provided.");
+                // Select a random member
+                documentation = _documentationProvider.Members.Values.ElementAt(Random.Shared.Next(_documentationProvider.Members.Count));
             }
             else if (!int.TryParse(query, out int id) || !_documentationProvider.Members.TryGetValue(id, out documentation))
             {
@@ -95,12 +96,12 @@ namespace OoLunar.DocBot.Commands
                 {
                     continue;
                 }
-                
+
                 if (!choices.TryAdd(member.DisplayName.TrimLength(100), member.GetHashCode().ToString(CultureInfo.InvariantCulture)))
                 {
                     continue;
                 }
-                
+
                 if (choices.Count == 10)
                 {
                     break;

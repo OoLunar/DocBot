@@ -28,7 +28,7 @@ namespace OoLunar.DocBot.Events.EventHandlers
         }
 
         [DiscordEvent]
-        public async Task LinkIssueAsync(DiscordClient client, MessageCreateEventArgs eventArgs)
+        public async Task LinkIssueAsync(DiscordClient client, MessageCreatedEventArgs eventArgs)
         {
             if (eventArgs.Author.IsBot)
             {

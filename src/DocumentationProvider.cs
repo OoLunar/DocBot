@@ -60,7 +60,7 @@ namespace OoLunar.DocBot
             }
 
             Members = members.OrderBy(x => x.Value.FullName).ToDictionary(x => x.Key, x => x.Value);
-            _logger.LogInformation("Reloaded documentation.");
+            _logger.LogInformation("Reloaded documentation. Found {MemberCount} members.", Members.Count);
             return;
         }
 
@@ -69,63 +69,70 @@ namespace OoLunar.DocBot
             ConcurrentQueue<DocumentationMember> members = new();
             await Parallel.ForEachAsync(assemblies, async (assembly, ct) =>
             {
-                Uri? apiUrl = await _github.TryParseRepositoryInformationAsync(assembly);
+                try
+                {
+                    Uri? apiUrl = await _github.TryParseRepositoryInformationAsync(assembly);
 
-                Parallel.ForEach(assembly.GetExportedTypes(), type =>
-                    Parallel.ForEach(type.GetMembers(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly).Append(type), member =>
-                    {
-                        if (member.TryGetPropertyValue("IsSpecialName", false) || member.GetCustomAttribute<CompilerGeneratedAttribute>(true) is not null)
+                    Parallel.ForEach(assembly.GetExportedTypes(), type =>
+                        Parallel.ForEach(type.GetMembers(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly).Append(type), member =>
                         {
-                            return;
-                        }
-
-                        string summary = member.GetXmlDocsSummary(_defaultXmlDocsOptions);
-                        string? remarks = member.GetXmlDocsRemarks(_defaultXmlDocsOptions);
-                        if (string.IsNullOrWhiteSpace(summary))
-                        {
-                            summary = "No summary provided.";
-                        }
-
-                        if (string.IsNullOrWhiteSpace(remarks))
-                        {
-                            remarks = null;
-                        }
-
-                        string? name = null;
-                        if (member.DeclaringType is null)
-                        {
-                            if (member is Type memberType)
+                            if (member.TryGetPropertyValue("IsSpecialName", false) || member.GetCustomAttribute<CompilerGeneratedAttribute>(true) is not null)
                             {
-                                name = memberType.FullName;
+                                return;
                             }
 
-                            name ??= member.Name;
-                        }
-                        else
-                        {
-                            name = $"{member.DeclaringType.FullName}.{member.Name}";
-                        }
+                            string summary = member.GetXmlDocsSummary(_defaultXmlDocsOptions);
+                            string? remarks = member.GetXmlDocsRemarks(_defaultXmlDocsOptions);
+                            if (string.IsNullOrWhiteSpace(summary))
+                            {
+                                summary = "No summary provided.";
+                            }
 
-                        StringBuilder stringBuilder = new("## ");
-                        stringBuilder.Append(Formatter.Sanitize(name));
-                        stringBuilder.AppendLine();
-                        stringBuilder.AppendLine("### Summary");
-                        stringBuilder.AppendLine(Formatter.Sanitize(summary));
-                        if (remarks is not null)
-                        {
-                            stringBuilder.AppendLine("### Remarks");
-                            stringBuilder.AppendLine(Formatter.Sanitize(remarks));
-                        }
+                            if (string.IsNullOrWhiteSpace(remarks))
+                            {
+                                remarks = null;
+                            }
 
-                        stringBuilder.AppendLine("### Declaration");
-                        stringBuilder.AppendLine(Formatter.BlockCode(member.GetDeclarationSyntax(), "cs"));
+                            string? name = null;
+                            if (member.DeclaringType is null)
+                            {
+                                if (member is Type memberType)
+                                {
+                                    name = memberType.FullName;
+                                }
 
-                        members.Enqueue(new DocumentationMember(
-                            name,
-                            member.GetFullName(),
-                            stringBuilder.ToString().TrimLength(2048),
-                            new Lazy<Task<Uri?>>(() => _github.SearchCodeForMemberAsync(member, apiUrl), false)));
-                    }));
+                                name ??= member.Name;
+                            }
+                            else
+                            {
+                                name = $"{member.DeclaringType.FullName}.{member.Name}";
+                            }
+
+                            StringBuilder stringBuilder = new("## ");
+                            stringBuilder.Append(Formatter.Sanitize(name));
+                            stringBuilder.AppendLine();
+                            stringBuilder.AppendLine("### Summary");
+                            stringBuilder.AppendLine(Formatter.Sanitize(summary));
+                            if (remarks is not null)
+                            {
+                                stringBuilder.AppendLine("### Remarks");
+                                stringBuilder.AppendLine(Formatter.Sanitize(remarks));
+                            }
+
+                            stringBuilder.AppendLine("### Declaration");
+                            stringBuilder.AppendLine(Formatter.BlockCode(member.GetDeclarationSyntax(), "cs"));
+
+                            members.Enqueue(new DocumentationMember(
+                                name,
+                                member.GetFullName(),
+                                stringBuilder.ToString().TrimLength(2048),
+                                new Lazy<Task<Uri?>>(() => _github.SearchCodeForMemberAsync(member, apiUrl), false)));
+                        }));
+                }
+                catch (Exception error)
+                {
+                    _logger.LogError(error, "Failed to load documentation for assembly: {AssemblyName}", assembly.FullName);
+                }
             });
 
             return members;
