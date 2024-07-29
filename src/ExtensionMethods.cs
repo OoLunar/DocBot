@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
@@ -103,6 +104,11 @@ namespace OoLunar.DocBot
         public static string GetAttributeSyntax(this MemberInfo memberInfo)
         {
             IList<CustomAttributeData> attributes = memberInfo.GetCustomAttributesData();
+            if (memberInfo.GetFullName() == "DSharpPlus.Entities.DiscordThreadChannel.CurrentMember")
+            {
+                Debugger.Break();
+            }
+
             return attributes.Count == 0 ? string.Empty : GetAttributeSyntax(attributes);
         }
 
@@ -114,13 +120,14 @@ namespace OoLunar.DocBot
 
         public static string GetAttributeSyntax(IList<CustomAttributeData> attributes)
         {
-            attributes = attributes.Where(attribute => !_ignoreAttributes.Contains(attribute.AttributeType.GetFullGenericTypeName())).ToList();
+            attributes = attributes.Where(attribute => !_ignoreAttributes.Contains(attribute.AttributeType.GetFullGenericTypeName())).Distinct().ToList();
             StringBuilder stringBuilder = new();
+            StringBuilder attributeBuilder = new();
             for (int i = 0; i < attributes.Count; i++)
             {
                 if (i == 0)
                 {
-                    stringBuilder.Append('[');
+                    attributeBuilder.Append('[');
                 }
 
                 CustomAttributeData attribute = attributes[i];
@@ -131,26 +138,26 @@ namespace OoLunar.DocBot
                     attributeName = $"{attributeName[..indexOfAttribute]}{attributeName[(indexOfAttribute + 9)..]}";
                 }
 
-                stringBuilder.Append(attributeName);
+                attributeBuilder.Append(attributeName);
                 Type[] genericArguments = attribute.AttributeType.GetGenericArguments();
                 if (genericArguments.Length != 0)
                 {
-                    stringBuilder.Append('<');
+                    attributeBuilder.Append('<');
                     for (int j = 0; j < genericArguments.Length; j++)
                     {
                         Type genericArgument = genericArguments[j];
-                        stringBuilder.Append(genericArgument.GetFullGenericTypeName());
+                        attributeBuilder.Append(genericArgument.GetFullGenericTypeName());
                         if (j != genericArguments.Length - 1)
                         {
-                            stringBuilder.Append(", ");
+                            attributeBuilder.Append(", ");
                         }
                     }
-                    stringBuilder.Append('>');
+                    attributeBuilder.Append('>');
                 }
 
                 if (attribute.ConstructorArguments.Count != 0 || attribute.NamedArguments.Count != 0)
                 {
-                    stringBuilder.Append('(');
+                    attributeBuilder.Append('(');
                     for (int j = 0; j < attribute.ConstructorArguments.Count; j++)
                     {
                         CustomAttributeTypedArgument argument = attribute.ConstructorArguments[j];
@@ -180,11 +187,11 @@ namespace OoLunar.DocBot
                                 }
                             }
 
-                            stringBuilder.Append(string.Join(" | ", enumValues));
+                            attributeBuilder.Append(string.Join(" | ", enumValues));
                         }
                         else
                         {
-                            stringBuilder.Append(argument.Value switch
+                            attributeBuilder.Append(argument.Value switch
                             {
                                 string @string => $"\"{@string}\"",
                                 char @char => $"'{@char}'",
@@ -196,41 +203,40 @@ namespace OoLunar.DocBot
 
                         if (j != (attribute.ConstructorArguments.Count - 1) || attribute.NamedArguments.Count != 0)
                         {
-                            stringBuilder.Append(", ");
+                            attributeBuilder.Append(", ");
                         }
                     }
 
                     for (int j = 0; j < attribute.NamedArguments.Count; j++)
                     {
                         CustomAttributeNamedArgument argument = attribute.NamedArguments[j];
-                        stringBuilder.Append(argument.MemberName);
-                        stringBuilder.Append(" = ");
-                        stringBuilder.Append(argument.TypedValue.Value switch
-                        {
-                            Enum @enum => $"{@enum.GetType().Name}.{@enum}",
-                            string @string => $"\"{@string}\"",
-                            char @char => $"'{@char}'",
-                            bool @bool => @bool ? "true" : "false",
-                            null => "null",
-                            _ => argument.TypedValue.Value
-                        });
+                        attributeBuilder.Append(argument.MemberName);
+                        attributeBuilder.Append(" = ");
+                        attributeBuilder.Append(argument.TypedValue.Value.FormatUnknownValue(argument.TypedValue.ArgumentType));
 
                         if (j != attribute.NamedArguments.Count - 1)
                         {
-                            stringBuilder.Append(", ");
+                            attributeBuilder.Append(", ");
                         }
                     }
-                    stringBuilder.Append(')');
+                    attributeBuilder.Append(')');
                 }
 
                 if (i != attributes.Count - 1)
                 {
-                    stringBuilder.Append(", ");
+                    attributeBuilder.Append(", ");
                 }
                 else if (i == attributes.Count - 1)
                 {
-                    stringBuilder.Append(']');
+                    attributeBuilder.Append(']');
                 }
+
+                if (!stringBuilder.ToString().Contains(attributeBuilder.ToString()))
+                {
+                    stringBuilder.Append(attributeBuilder);
+                }
+
+                attributeBuilder.Clear();
             }
 
             return stringBuilder.ToString();
@@ -425,14 +431,56 @@ namespace OoLunar.DocBot
                 stringBuilder.Remove(stringBuilder.Length - 2, 2);
             }
 
-            int propertyCount = 0;
-            foreach (PropertyInfo propertyInfo in type.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.Static))
+            // Max 3 properties, 3 methods
+            int memberCount = 0;
+            foreach (PropertyInfo propertyInfo in type.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.Static).OrderBy(property => property.Name))
             {
-                stringBuilder.Append(propertyCount++ == 0 ? "\n{\n\t" : "\n\t");
+                stringBuilder.Append(memberCount++ == 0 ? "\n{\n\t" : "\n\t");
                 stringBuilder.Append(propertyInfo.GetPropertyDeclarationSyntax());
+                if (memberCount > 2)
+                {
+                    break;
+                }
             }
 
-            if (propertyCount == 0)
+            if (memberCount != 0)
+            {
+                stringBuilder.AppendLine();
+            }
+
+            foreach (MethodInfo methodInfo in type.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.Static).OrderBy(method => method.Name))
+            {
+                if (methodInfo.IsSpecialName || methodInfo.GetCustomAttribute<CompilerGeneratedAttribute>(true) is not null || methodInfo.GetBaseDefinition() != methodInfo)
+                {
+                    continue;
+                }
+
+                stringBuilder.Append(memberCount++ == 0 ? "\n{\n\t" : "\n\t");
+
+                string methodDeclaration = methodInfo.GetMethodDeclarationSyntax();
+                if (methodDeclaration.Contains('\n'))
+                {
+                    // Indent everything
+                    methodDeclaration = methodDeclaration.Replace("\n", "\n\t");
+
+                    // Append line for readability
+                    methodDeclaration += '\n';
+                }
+
+                stringBuilder.Append(methodDeclaration);
+                if (memberCount > 5)
+                {
+                    break;
+                }
+            }
+
+            // Trim trailing newlines
+            if (stringBuilder[^1] == '\n')
+            {
+                stringBuilder.Remove(stringBuilder.Length - 1, 1);
+            }
+
+            if (memberCount == 0)
             {
                 stringBuilder.Append(';');
             }
@@ -600,64 +648,26 @@ namespace OoLunar.DocBot
 
             // Parameters
             ParameterInfo[] parameters = methodBase.GetParameters();
-            if (parameters.Length != 0)
+            if (parameters.Length < 4)
+            {
+                stringBuilder.Append('(');
+                for (int i = 0; i < parameters.Length; i++)
+                {
+                    stringBuilder.Append(parameters[i].GetParameterDeclarationSyntax(methodBase, i));
+                    if (i != parameters.Length - 1)
+                    {
+                        stringBuilder.Append(", ");
+                    }
+                }
+                stringBuilder.Append(");");
+            }
+            else if (parameters.Length > 1)
             {
                 stringBuilder.Append("\n(");
                 for (int i = 0; i < parameters.Length; i++)
                 {
                     stringBuilder.Append("\n\t");
-
-                    ParameterInfo parameter = parameters[i];
-                    string attributeSyntax = parameter.GetAttributeSyntax();
-                    if (!string.IsNullOrWhiteSpace(attributeSyntax))
-                    {
-                        stringBuilder.Append(attributeSyntax);
-                        stringBuilder.Append(' ');
-                    }
-
-                    if (i == 0 && methodBase.GetCustomAttribute<ExtensionAttribute>() is not null)
-                    {
-                        stringBuilder.Append("this ");
-                    }
-                    else if (parameter.GetCustomAttribute<ParamArrayAttribute>() is not null)
-                    {
-                        stringBuilder.Append("params ");
-                    }
-                    else if (parameter.GetCustomAttribute<InAttribute>() is not null)
-                    {
-                        stringBuilder.Append("in ");
-                    }
-                    else if (parameter.GetCustomAttribute<OutAttribute>() is not null)
-                    {
-                        stringBuilder.Append("out ");
-                    }
-                    else if (parameter.ParameterType.IsByRef)
-                    {
-                        stringBuilder.Append("ref ");
-                    }
-
-                    stringBuilder.Append(parameter.ParameterType.GetFullGenericTypeName());
-                    stringBuilder.Append(' ');
-                    stringBuilder.Append(parameter.Name);
-
-                    if (parameter.HasDefaultValue)
-                    {
-                        stringBuilder.Append(" = ");
-                        stringBuilder.Append(parameter.DefaultValue switch
-                        {
-                            Enum @enum => $"{@enum.GetType().Name}.{@enum}",
-                            string @string => $"\"{@string}\"",
-                            char @char => $"'{@char}'",
-                            bool @bool => @bool ? "true" : "false",
-                            null => "null",
-                            _ => parameter.DefaultValue
-                        });
-                    }
-
-                    if (i != parameters.Length - 1)
-                    {
-                        stringBuilder.Append(',');
-                    }
+                    stringBuilder.Append(parameters[i].GetParameterDeclarationSyntax(methodBase, i));
                 }
                 stringBuilder.Append("\n);");
             }
@@ -669,10 +679,62 @@ namespace OoLunar.DocBot
             return stringBuilder.ToString();
         }
 
+        public static string GetParameterDeclarationSyntax(this ParameterInfo parameter, MethodBase methodBase, int parameterIndex)
+        {
+            StringBuilder stringBuilder = new();
+
+            string attributeSyntax = parameter.GetAttributeSyntax();
+            if (!string.IsNullOrWhiteSpace(attributeSyntax))
+            {
+                stringBuilder.Append(attributeSyntax);
+                stringBuilder.Append(' ');
+            }
+
+            if (parameterIndex == 0 && methodBase.GetCustomAttribute<ExtensionAttribute>() is not null)
+            {
+                stringBuilder.Append("this ");
+            }
+            else if (parameter.GetCustomAttribute<ParamArrayAttribute>() is not null)
+            {
+                stringBuilder.Append("params ");
+            }
+            else if (parameter.GetCustomAttribute<InAttribute>() is not null)
+            {
+                stringBuilder.Append("in ");
+            }
+            else if (parameter.GetCustomAttribute<OutAttribute>() is not null)
+            {
+                stringBuilder.Append("out ");
+            }
+            else if (parameter.ParameterType.IsByRef)
+            {
+                stringBuilder.Append("ref ");
+            }
+
+            stringBuilder.Append(parameter.ParameterType.GetFullGenericTypeName());
+            stringBuilder.Append(' ');
+            stringBuilder.Append(parameter.Name);
+
+            if (parameter.HasDefaultValue)
+            {
+                stringBuilder.Append(" = ");
+                stringBuilder.Append(parameter.DefaultValue switch
+                {
+                    Enum @enum => $"{@enum.GetType().Name}.{@enum}",
+                    string @string => $"\"{@string}\"",
+                    char @char => $"'{@char}'",
+                    bool @bool => @bool ? "true" : "false",
+                    null => "null",
+                    _ => parameter.DefaultValue
+                });
+            }
+
+            return stringBuilder.ToString();
+        }
+
         public static string GetPropertyDeclarationSyntax(this PropertyInfo propertyInfo)
         {
             StringBuilder stringBuilder = new();
-            stringBuilder.Append(propertyInfo.GetAttributeSyntax());
             if (stringBuilder.Length != 0)
             {
                 stringBuilder.Append('\n');
@@ -845,7 +907,14 @@ namespace OoLunar.DocBot
             else if (fieldInfo.IsLiteral)
             {
                 stringBuilder.Append(" = ");
-                stringBuilder.Append(fieldInfo.GetRawConstantValue().FormatUnknownValue(fieldInfo.FieldType));
+                if (fieldInfo.DeclaringType?.IsEnum ?? false)
+                {
+                    stringBuilder.Append(fieldInfo.GetRawConstantValue());
+                }
+                else
+                {
+                    stringBuilder.Append(fieldInfo.GetRawConstantValue().FormatUnknownValue(fieldInfo.FieldType));
+                }
             }
 
             stringBuilder.Append(';');
