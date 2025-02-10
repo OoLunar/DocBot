@@ -127,7 +127,25 @@ namespace OoLunar.DocBot
                     Environment.Exit(1);
                 }
 
-                DiscordClientBuilder clientBuilder = DiscordClientBuilder.CreateDefault(docBotConfiguration.Discord.Token, TextCommandProcessor.RequiredIntents | SlashCommandProcessor.RequiredIntents | DiscordIntents.MessageContents, serviceCollection);
+                DiscordClientBuilder clientBuilder = DiscordClientBuilder
+                    .CreateDefault(docBotConfiguration.Discord.Token, TextCommandProcessor.RequiredIntents | SlashCommandProcessor.RequiredIntents | DiscordIntents.MessageContents, serviceCollection)
+                    .UseCommands((config, extension) =>
+                    {
+                        // Add all commands by scanning the current assembly
+                        extension.AddCommands(typeof(Program).Assembly);
+                        
+                        // Add all processors
+                        TextCommandProcessor textCommandProcessor = new(new()
+                        {
+                            PrefixResolver = new DefaultPrefixResolver(true, docBotConfiguration.Discord.Prefix).ResolvePrefixAsync,
+                            IgnoreBots = false
+                        });
+
+                        extension.AddProcessor(textCommandProcessor);
+                    }, new CommandsConfiguration()
+                    {
+                        DebugGuildId = docBotConfiguration.Discord.DebugGuildId
+                    });
                 clientBuilder.DisableDefaultLogging();
                 return clientBuilder.Build();
             });
@@ -145,24 +163,6 @@ namespace OoLunar.DocBot
             DiscordEventManager discordEventManager = serviceProvider.GetRequiredService<DiscordEventManager>();
             DocumentationProvider documentationProvider = discordClient.ServiceProvider.GetRequiredService<DocumentationProvider>();
             await documentationProvider.ReloadAsync();
-
-            // Register extensions here since these involve asynchronous operations
-            CommandsExtension commandsExtension = discordClient.UseCommands(new CommandsConfiguration()
-            {
-                DebugGuildId = docBotConfiguration.Discord.DebugGuildId
-            });
-
-            // Add all commands by scanning the current assembly
-            commandsExtension.AddCommands(typeof(Program).Assembly);
-
-            // Add all processors
-            TextCommandProcessor textCommandProcessor = new(new()
-            {
-                PrefixResolver = new DefaultPrefixResolver(true, docBotConfiguration.Discord.Prefix).ResolvePrefixAsync,
-                IgnoreBots = false
-            });
-
-            await commandsExtension.AddProcessorAsync(textCommandProcessor);
 
             // Register event handlers
             discordEventManager.RegisterEventHandlers(discordClient);

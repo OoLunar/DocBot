@@ -10,6 +10,7 @@ using DSharpPlus.Commands.Processors.SlashCommands;
 using DSharpPlus.Commands.Processors.SlashCommands.ArgumentModifiers;
 using DSharpPlus.Commands.Trees;
 using DSharpPlus.Commands.Trees.Metadata;
+using DSharpPlus.Entities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -83,12 +84,12 @@ namespace OoLunar.DocBot.Commands
             await context.EditResponseAsync(documentation.Content);
         }
 
-        public ValueTask<IReadOnlyDictionary<string, object>> AutoCompleteAsync(AutoCompleteContext context)
+        public ValueTask<IEnumerable<DiscordAutoCompleteChoice>> AutoCompleteAsync(AutoCompleteContext context)
         {
-            string query = context.UserInput.ToString() ?? string.Empty;
+            string query = context.UserInput ?? string.Empty;
             _logger.LogDebug("Querying documentation for: \"{Query}\"", query);
 
-            Dictionary<string, object> choices = [];
+            Dictionary<string, DiscordAutoCompleteChoice> choices = [];
             foreach (DocumentationMember member in _documentationProvider.Members.Values)
             {
                 if (!member.DisplayName.StartsWith(query, StringComparison.OrdinalIgnoreCase)
@@ -97,7 +98,11 @@ namespace OoLunar.DocBot.Commands
                     continue;
                 }
 
-                if (!choices.TryAdd(member.DisplayName.TrimLength(100), member.GetHashCode().ToString(CultureInfo.InvariantCulture)))
+                string trimmedDisplayName = member.DisplayName.TrimLength(100);
+                DiscordAutoCompleteChoice choice = new(trimmedDisplayName,
+                    member.GetHashCode().ToString(CultureInfo.InvariantCulture));
+                
+                if (!choices.TryAdd(trimmedDisplayName, choice))
                 {
                     continue;
                 }
@@ -108,7 +113,7 @@ namespace OoLunar.DocBot.Commands
                 }
             }
 
-            return ValueTask.FromResult<IReadOnlyDictionary<string, object>>(choices);
+            return ValueTask.FromResult<IEnumerable<DiscordAutoCompleteChoice>>(choices.Values);
         }
     }
 }
