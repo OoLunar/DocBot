@@ -11,9 +11,9 @@ RUN apk add git \
 FROM mcr.microsoft.com/dotnet/sdk:9.0-alpine
 WORKDIR /src
 
-COPY --from=build /src/src/bin/Release/net8.0/linux-musl-x64/publish /src
+COPY --from=build /src/src/bin/Release/net9.0/linux-musl-x64/publish /src
 RUN apk upgrade --update-cache --available \
     && apk add openssl icu-libs git \
     && rm -rf /var/cache/apk/*
 
-ENTRYPOINT /src/DocBot
+ENTRYPOINT ["/src/DocBot"]
