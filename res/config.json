@@ -20,7 +20,7 @@
             "Token": "My GitHub token."
         },
         "LocalFile": {
-            "Path": "libs/DocBot/src/bin/Debug/net8.0/DocBot.dll"
+            "Path": "libs/DocBot/src/bin/Debug/net9.0/DocBot.dll"
         },
         "LocalProject": {
             "Path": "libs/DocBot"
