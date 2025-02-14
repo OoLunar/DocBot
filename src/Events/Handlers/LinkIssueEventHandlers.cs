@@ -13,7 +13,7 @@ using OoLunar.DocBot.Configuration;
 
 namespace OoLunar.DocBot.Events.EventHandlers
 {
-    public sealed partial class LinkIssueEventHandlers
+    public sealed partial class LinkIssueEventHandlers : IEventHandler<MessageCreatedEventArgs>
     {
         [GeneratedRegex("##(\\d+)")]
         private static partial Regex IssueRegex();
@@ -27,8 +27,7 @@ namespace OoLunar.DocBot.Events.EventHandlers
             _httpClient = httpClient;
         }
 
-        [DiscordEvent]
-        public async Task LinkIssueAsync(DiscordClient client, MessageCreatedEventArgs eventArgs)
+        public async Task HandleEventAsync(DiscordClient client, MessageCreatedEventArgs eventArgs)
         {
             if (eventArgs.Author.IsBot)
             {

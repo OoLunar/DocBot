@@ -13,6 +13,7 @@ using Microsoft.Extensions.Logging;
 using OoLunar.DocBot.AssemblyProviders;
 using OoLunar.DocBot.Configuration;
 using OoLunar.DocBot.Events;
+using OoLunar.DocBot.Events.EventHandlers;
 using OoLunar.DocBot.GitHub;
 using Serilog;
 using Serilog.Events;
@@ -111,12 +112,6 @@ namespace OoLunar.DocBot
 
             serviceCollection.AddSingleton<AssemblyProviderAsync>((serviceProvider) => serviceProvider.GetRequiredService<IAssemblyProvider>().GetAssembliesAsync);
             serviceCollection.AddSingleton<DocumentationProvider>();
-            serviceCollection.AddSingleton(serviceProvider =>
-            {
-                DiscordEventManager eventManager = new(serviceProvider);
-                eventManager.GatherEventHandlers(typeof(Program).Assembly);
-                return eventManager;
-            });
 
             serviceCollection.AddSingleton(serviceProvider =>
             {
@@ -145,6 +140,10 @@ namespace OoLunar.DocBot
                     }, new CommandsConfiguration()
                     {
                         DebugGuildId = docBotConfiguration.Discord.DebugGuildId
+                    })
+                    .ConfigureEventHandlers(events =>
+                    {
+                        events.AddEventHandlers<LinkIssueEventHandlers>(ServiceLifetime.Singleton);
                     });
                 clientBuilder.DisableDefaultLogging();
                 return clientBuilder.Build();
@@ -160,12 +159,8 @@ namespace OoLunar.DocBot
             }
 
             DiscordClient discordClient = serviceProvider.GetRequiredService<DiscordClient>();
-            DiscordEventManager discordEventManager = serviceProvider.GetRequiredService<DiscordEventManager>();
             DocumentationProvider documentationProvider = discordClient.ServiceProvider.GetRequiredService<DocumentationProvider>();
             await documentationProvider.ReloadAsync();
-
-            // Register event handlers
-            discordEventManager.RegisterEventHandlers(discordClient);
 
             // Start the bot
             await discordClient.ConnectAsync();
