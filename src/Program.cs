@@ -12,7 +12,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OoLunar.DocBot.AssemblyProviders;
 using OoLunar.DocBot.Configuration;
-using OoLunar.DocBot.Events;
 using OoLunar.DocBot.Events.EventHandlers;
 using OoLunar.DocBot.GitHub;
 using Serilog;
@@ -128,7 +127,7 @@ namespace OoLunar.DocBot
                     {
                         // Add all commands by scanning the current assembly
                         extension.AddCommands(typeof(Program).Assembly);
-                        
+
                         // Add all processors
                         TextCommandProcessor textCommandProcessor = new(new()
                         {
@@ -141,10 +140,7 @@ namespace OoLunar.DocBot
                     {
                         DebugGuildId = docBotConfiguration.Discord.DebugGuildId
                     })
-                    .ConfigureEventHandlers(events =>
-                    {
-                        events.AddEventHandlers<LinkIssueEventHandlers>(ServiceLifetime.Singleton);
-                    });
+                    .ConfigureEventHandlers(events => events.AddEventHandlers<LinkIssueEventHandlers>(ServiceLifetime.Singleton));
                 clientBuilder.DisableDefaultLogging();
                 return clientBuilder.Build();
             });
