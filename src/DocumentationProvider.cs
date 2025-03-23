@@ -64,6 +64,36 @@ namespace OoLunar.DocBot
             return;
         }
 
+        public IEnumerable<DocumentationMember> FindMatchingDocs(string query)
+        {
+            List<DocumentationMember> foundDocs = [];
+
+            if (int.TryParse(query, out int id)
+                && Members.TryGetValue(id, out DocumentationMember? foundDockMember))
+            {
+                foundDocs.Add(foundDockMember);
+            }
+            else
+            {
+                foreach (DocumentationMember member in Members.Values)
+                {
+                    if (member.FullName.Equals(query, StringComparison.OrdinalIgnoreCase)
+                        || member.DisplayName.Equals(query, StringComparison.OrdinalIgnoreCase))
+                    {
+                        foundDocs.Clear();
+                        foundDocs.Add(member);
+                        break;
+                    }
+                    else if (member.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase))
+                    {
+                        foundDocs.Add(member);
+                    }
+                }
+            }
+
+            return foundDocs;
+        }
+
         private async Task<ConcurrentQueue<DocumentationMember>> GetMembersAsync(IEnumerable<Assembly> assemblies)
         {
             ConcurrentQueue<DocumentationMember> members = new();
