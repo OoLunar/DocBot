@@ -64,12 +64,11 @@ namespace OoLunar.DocBot
             return;
         }
 
-        public IEnumerable<DocumentationMember> FindMatchingDocs(string query)
+        public IReadOnlyList<DocumentationMember> FindMatchingDocs(string query)
         {
             List<DocumentationMember> foundDocs = [];
 
-            if (int.TryParse(query, out int id)
-                && Members.TryGetValue(id, out DocumentationMember? foundDockMember))
+            if (int.TryParse(query, out int id) && Members.TryGetValue(id, out DocumentationMember? foundDockMember))
             {
                 foundDocs.Add(foundDockMember);
             }
@@ -77,8 +76,7 @@ namespace OoLunar.DocBot
             {
                 foreach (DocumentationMember member in Members.Values)
                 {
-                    if (member.FullName.Equals(query, StringComparison.OrdinalIgnoreCase)
-                        || member.DisplayName.Equals(query, StringComparison.OrdinalIgnoreCase))
+                    if (member.FullName.Equals(query, StringComparison.OrdinalIgnoreCase) || member.DisplayName.Equals(query, StringComparison.OrdinalIgnoreCase))
                     {
                         foundDocs.Clear();
                         foundDocs.Add(member);

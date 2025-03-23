@@ -27,61 +27,40 @@ namespace OoLunar.DocBot.Commands
             _logger = logger ?? NullLoggerFactory.Instance.CreateLogger<DocumentationCommand>();
         }
 
-        [Command("documentation"),
-            TextAlias("doc", "docs"),
-            Description("Retrieves documentation for a given type or member.")]
-        public async Task GetDocumentationAsync(
-            CommandContext context,
-
-            [Description("Which type or member to grab documentation upon."),
-                SlashAutoCompleteProvider<DocumentationCommand>,
-                RemainingText]
-            string? query = null)
+        [Command("documentation"), TextAlias("doc", "docs"), Description("Retrieves documentation for a given type or member.")]
+        public async Task GetDocumentationAsync(CommandContext context,
+            [Description("Which type or member to grab documentation upon."), SlashAutoCompleteProvider<DocumentationCommand>, RemainingText] string? query = null)
         {
-            List<DocumentationMember> foundDocs = [];
             if (string.IsNullOrWhiteSpace(query))
             {
                 // Select a random member
-                foundDocs.Add(_documentationProvider.Members.Values.ElementAt(Random.Shared.Next(_documentationProvider.Members.Count)));
-            }
-            else
-            {
-                foundDocs.AddRange(_documentationProvider.FindMatchingDocs(query));
+                await ReplyWithDocumentationAsync(context, _documentationProvider.Members.Values.ElementAt(Random.Shared.Next(_documentationProvider.Members.Count)));
+                return;
             }
 
+            IReadOnlyList<DocumentationMember> foundDocs = _documentationProvider.FindMatchingDocs(query);
             switch (foundDocs.Count)
             {
                 case 0:
-                    {
-                        _logger.LogDebug("No documentation found for: {Query}.", query);
-                        await context.RespondAsync("No documentation found.");
-                        return;
-                    }
-
+                    _logger.LogDebug("No documentation found for: {Query}.", query);
+                    await context.RespondAsync("No documentation found.");
+                    return;
                 case 1:
-                    {
-                        await ReplyWithDocumentationAsync(context, foundDocs[0]);
-                    }
+                    await ReplyWithDocumentationAsync(context, foundDocs[0]);
                     break;
-
                 case > 25:
-                    {
-                        DiscordEmbedBuilder embedBuilder = new DiscordEmbedBuilder()
-                            .WithTitle("Refine your search!")
-                            .WithDescription($"More than 25 items matched your query ({foundDocs.Count})! Please refine your search and try again!")
-                            .WithColor(DiscordColor.Red);
+                    DiscordEmbedBuilder embedBuilder = new DiscordEmbedBuilder()
+                        .WithTitle("Refine your search!")
+                        .WithDescription($"More than 25 items matched your query ({foundDocs.Count})! Please refine your search and try again!")
+                        .WithColor(DiscordColor.Red);
 
-                        await context.RespondAsync(embedBuilder);
-                    }
+                    await context.RespondAsync(embedBuilder);
                     break;
-
                 case > 1:
-                    {
-                        DiscordEmbedBuilder embedBuilder = new();
-                        FormatDocumentationList(embedBuilder, foundDocs);
+                    embedBuilder = new();
+                    FormatDocumentationList(embedBuilder, foundDocs);
 
-                        await context.RespondAsync(embedBuilder);
-                    }
+                    await context.RespondAsync(embedBuilder);
                     break;
             }
         }
@@ -140,7 +119,7 @@ namespace OoLunar.DocBot.Commands
             await context.EditResponseAsync(foundDocs.Content);
         }
 
-        private static void FormatDocumentationList(DiscordEmbedBuilder embedBuilder, List<DocumentationMember> foundDocs)
+        private static void FormatDocumentationList(DiscordEmbedBuilder embedBuilder, IReadOnlyList<DocumentationMember> foundDocs)
         {
             embedBuilder.WithTitle($"Your query returned {foundDocs.Count} matching items!")
                 .WithColor(0xEED202);
