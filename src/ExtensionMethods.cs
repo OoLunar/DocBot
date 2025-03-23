@@ -530,17 +530,65 @@ namespace OoLunar.DocBot
                 stringBuilder.Append("{\n");
                 stringBuilder.Append("  ");
 
-                Array values = enumType.GetEnumValues();
-                for (int i = 0; i < names.Length; i++)
+                Array values = enumType.GetEnumValuesAsUnderlyingType();
+                if (enumType.GetCustomAttribute<FlagsAttribute>() is not null)
                 {
-                    string name = names[i];
-                    object value = values.GetValue(i)!;
-                    stringBuilder.Append(name);
-                    stringBuilder.Append(" = ");
-                    stringBuilder.Append(Convert.ChangeType(value, enumType.GetEnumUnderlyingType(), CultureInfo.InvariantCulture));
-                    if (i != names.Length - 1)
+                    Array.Sort(values);
+                    for (int i = 0; i < names.Length; i++)
                     {
-                        stringBuilder.Append(",\n  ");
+                        object value = values.GetValue(i)!;
+                        stringBuilder.Append(Enum.GetName(enumType, value));
+                        stringBuilder.Append(" = ");
+
+                        // Calculate bit position, also ensure we don't divide by 0
+                        if (value is not 0)
+                        {
+                            stringBuilder.Append("1 << ");
+
+                            int position = 0;
+                            ulong valueParsed = ulong.Parse(value.ToString()!, CultureInfo.InvariantCulture);
+                            while ((valueParsed & 1) == 0 && valueParsed > 0)
+                            {
+                                position++;
+                                valueParsed >>= 1;
+                            }
+
+                            // If the position is zero, it must be a combination of other flags.
+                            // Just append the literal value
+                            if (position == 0)
+                            {
+                                stringBuilder.Remove(stringBuilder.Length - 5, 5);
+                                stringBuilder.Append(value);
+                            }
+                            else
+                            {
+                                stringBuilder.Append(position);
+                            }
+                        }
+                        else
+                        {
+                            stringBuilder.Append('0');
+                        }
+
+                        if (i != names.Length - 1)
+                        {
+                            stringBuilder.Append(",\n  ");
+                        }
+                    }
+                }
+                else
+                {
+                    for (int i = 0; i < names.Length; i++)
+                    {
+                        string name = names[i];
+                        object value = values.GetValue(i)!;
+                        stringBuilder.Append(name);
+                        stringBuilder.Append(" = ");
+                        stringBuilder.Append(value);
+                        if (i != names.Length - 1)
+                        {
+                            stringBuilder.Append(",\n  ");
+                        }
                     }
                 }
 
