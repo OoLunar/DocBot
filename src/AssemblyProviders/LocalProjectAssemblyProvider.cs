@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.FileSystemGlobbing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using OoLunar.DocBot.Configuration;
@@ -19,17 +20,24 @@ namespace OoLunar.DocBot.AssemblyProviders
 
         private readonly ILogger<LocalProjectAssemblyProvider> _logger;
         private readonly string _projectPath;
+        private readonly Matcher _ignoreProjectGlobs;
 
-        public LocalProjectAssemblyProvider(string projectPath, ILogger<LocalProjectAssemblyProvider>? logger = null)
+        public LocalProjectAssemblyProvider(string projectPath, Matcher ignoreProjectGlobs, ILogger<LocalProjectAssemblyProvider>? logger = null)
         {
             _logger = logger ?? NullLoggerFactory.Instance.CreateLogger<LocalProjectAssemblyProvider>();
             _projectPath = projectPath;
+            _ignoreProjectGlobs = ignoreProjectGlobs;
         }
 
         public LocalProjectAssemblyProvider(DocBotConfiguration configuration, ILogger<LocalProjectAssemblyProvider>? logger = null)
         {
             _logger = logger ?? NullLoggerFactory.Instance.CreateLogger<LocalProjectAssemblyProvider>();
             _projectPath = configuration.AssemblyProviders[Name].GetValue("path", "src")!;
+            _ignoreProjectGlobs = new();
+            foreach (string glob in configuration.AssemblyProviders[Name].GetSection("IgnoreProjectGlobs")?.Get<string[]>() ?? [])
+            {
+                _ignoreProjectGlobs.AddInclude(glob);
+            }
         }
 
         public async ValueTask<IEnumerable<Assembly>> GetAssembliesAsync()
@@ -37,9 +45,14 @@ namespace OoLunar.DocBot.AssemblyProviders
             List<Assembly> assemblies = [];
             foreach (string file in Directory.EnumerateFiles(_projectPath, "*.csproj", SearchOption.AllDirectories).OrderBy(x => x.Count(character => character == '.')).ThenBy(x => x))
             {
-                if (File.ReadAllText(file).Contains("<OutputType>Exe</OutputType>"))
+                if (_ignoreProjectGlobs.Match(file).HasMatches)
                 {
-                    _logger.LogDebug("Skipping project {ProjectName} because it is an executable.", file);
+                    _logger.LogInformation("Skipping project {ProjectName} because it is ignored.", file);
+                    continue;
+                }
+                else if (File.ReadAllText(file).Contains("<OutputType>Exe</OutputType>"))
+                {
+                    _logger.LogInformation("Skipping project {ProjectName} because it is an executable.", file);
                     continue;
                 }
 

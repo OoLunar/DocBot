@@ -15,7 +15,6 @@ namespace OoLunar.DocBot.AssemblyProviders
 {
     public sealed class NugetAssemblyProvider : IAssemblyProvider
     {
-
         private const string TARGET_FRAMEWORK = ThisAssembly.Project.TargetFramework;
         private const string CSPROJ_TEMPLATE = $"""
 <Project Sdk="Microsoft.NET.Sdk">

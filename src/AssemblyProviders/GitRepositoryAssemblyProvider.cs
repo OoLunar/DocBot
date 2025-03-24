@@ -5,6 +5,7 @@ using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.FileSystemGlobbing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using OoLunar.DocBot.Configuration;
@@ -25,7 +26,14 @@ namespace OoLunar.DocBot.AssemblyProviders
             _logger = gitAssemblyProviderLogger ?? NullLoggerFactory.Instance.CreateLogger<GitRepositoryAssemblyProvider>();
             _repositoryPath = configuration.AssemblyProviders[Name].GetValue("path", "src")!;
             _repositoryUrl = configuration.AssemblyProviders[Name].GetValue<string>("url")!;
-            _localProjectAssemblyProvider = new LocalProjectAssemblyProvider(_repositoryPath, localProjectAssemblyProviderLogger);
+
+            Matcher ignoreProjectGlobs = new();
+            foreach (string glob in configuration.AssemblyProviders[Name].GetSection("IgnoreProjectGlobs")?.Get<string[]>() ?? [])
+            {
+                ignoreProjectGlobs.AddInclude(glob);
+            }
+
+            _localProjectAssemblyProvider = new LocalProjectAssemblyProvider(_repositoryPath, ignoreProjectGlobs, localProjectAssemblyProviderLogger);
             if (string.IsNullOrWhiteSpace(_repositoryUrl))
             {
                 throw new InvalidOperationException("Repository URL is required.");
