@@ -89,7 +89,7 @@ namespace OoLunar.DocBot
                 }
             }
 
-            foundDocs.Sort((x, y) => ReferenceEquals(x, y) ? string.CompareOrdinal(x.DisplayName, y.DisplayName) : 0);
+            foundDocs.Sort((x, y) => string.CompareOrdinal(x.FullName, y.FullName));
             return foundDocs;
         }
 
