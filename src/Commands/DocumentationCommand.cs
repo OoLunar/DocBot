@@ -76,7 +76,7 @@ namespace OoLunar.DocBot.Commands
 
         public ValueTask<IEnumerable<DiscordAutoCompleteChoice>> AutoCompleteAsync(AutoCompleteContext context)
         {
-            string query = context.UserInput ?? string.Empty;
+            string query = context.UserInput?.Trim() ?? string.Empty;
             _logger.LogDebug("Querying documentation for: \"{Query}\"", query);
 
             Dictionary<string, DiscordAutoCompleteChoice> choices = [];
