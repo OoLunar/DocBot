@@ -13,6 +13,8 @@ using DSharpPlus.Commands.Trees.Metadata;
 using DSharpPlus.Entities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using OoLunar.DocBot.Interactivity;
+using OoLunar.DocBot.Interactivity.Moments.Pagination;
 
 namespace OoLunar.DocBot.Commands
 {
@@ -20,10 +22,12 @@ namespace OoLunar.DocBot.Commands
     {
         private readonly ILogger<DocumentationCommand> _logger;
         private readonly DocumentationProvider _documentationProvider;
+        private readonly Procrastinator _procrastinator;
 
-        public DocumentationCommand(DocumentationProvider documentationProvider, ILogger<DocumentationCommand>? logger = null)
+        public DocumentationCommand(DocumentationProvider documentationProvider, Procrastinator procrastinator, ILogger<DocumentationCommand>? logger = null)
         {
             _documentationProvider = documentationProvider;
+            _procrastinator = procrastinator;
             _logger = logger ?? NullLoggerFactory.Instance.CreateLogger<DocumentationCommand>();
         }
 
@@ -39,30 +43,35 @@ namespace OoLunar.DocBot.Commands
             }
 
             IReadOnlyList<DocumentationMember> foundDocs = _documentationProvider.FindMatchingDocs(query);
-            switch (foundDocs.Count)
+            if (foundDocs.Count == 0)
             {
-                case 0:
-                    _logger.LogDebug("No documentation found for: {Query}.", query);
-                    await context.RespondAsync("No documentation found.");
-                    return;
-                case 1:
-                    await ReplyWithDocumentationAsync(context, foundDocs[0]);
-                    break;
-                case > 25:
-                    DiscordEmbedBuilder embedBuilder = new DiscordEmbedBuilder()
-                        .WithTitle("Refine your search!")
-                        .WithDescription($"More than 25 items matched your query ({foundDocs.Count})! Please refine your search and try again!")
-                        .WithColor(DiscordColor.Red);
-
-                    await context.RespondAsync(embedBuilder);
-                    break;
-                case > 1:
-                    embedBuilder = new();
-                    FormatDocumentationList(embedBuilder, foundDocs);
-
-                    await context.RespondAsync(embedBuilder);
-                    break;
+                _logger.LogDebug("No documentation found for: {Query}.", query);
+                await context.RespondAsync("No documentation found.");
+                return;
             }
+
+            bool deferred = false;
+            List<Page> pages = [];
+            foreach (DocumentationMember member in foundDocs)
+            {
+                if (!member.SourceUri.IsValueCreated && !deferred)
+                {
+                    deferred = true;
+                    await context.DeferResponseAsync();
+
+                    Uri? source = await member.SourceUri.Value;
+                    if (source is not null)
+                    {
+                        string[] lines = member.Content.Split('\n');
+                        lines[0] = $"## [{lines[0][3..]}](<{source}>)";
+                        member.Content = string.Join('\n', lines);
+                    }
+                }
+
+                pages.Add(new Page(new DiscordMessageBuilder().WithContent(member.Content), member.DisplayName, member.Content.Split('\n')[2]));
+            }
+
+            await context.PaginateAsync(pages);
         }
 
         public ValueTask<IEnumerable<DiscordAutoCompleteChoice>> AutoCompleteAsync(AutoCompleteContext context)

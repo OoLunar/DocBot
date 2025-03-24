@@ -14,6 +14,7 @@ using OoLunar.DocBot.AssemblyProviders;
 using OoLunar.DocBot.Configuration;
 using OoLunar.DocBot.Events.EventHandlers;
 using OoLunar.DocBot.GitHub;
+using OoLunar.DocBot.Interactivity;
 using Serilog;
 using Serilog.Events;
 using Serilog.Sinks.SystemConsole.Themes;
@@ -111,6 +112,7 @@ namespace OoLunar.DocBot
 
             serviceCollection.AddSingleton<AssemblyProviderAsync>((serviceProvider) => serviceProvider.GetRequiredService<IAssemblyProvider>().GetAssembliesAsync);
             serviceCollection.AddSingleton<DocumentationProvider>();
+            serviceCollection.AddSingleton<Procrastinator>();
 
             serviceCollection.AddSingleton(serviceProvider =>
             {
@@ -140,7 +142,11 @@ namespace OoLunar.DocBot
                     {
                         DebugGuildId = docBotConfiguration.Discord.DebugGuildId
                     })
-                    .ConfigureEventHandlers(events => events.AddEventHandlers<LinkIssueEventHandlers>(ServiceLifetime.Singleton));
+                    .ConfigureEventHandlers(events =>
+                    {
+                        events.AddEventHandlers<LinkIssueEventHandlers>(ServiceLifetime.Singleton);
+                        events.AddEventHandlers<Procrastinator>(ServiceLifetime.Singleton);
+                    });
                 clientBuilder.DisableDefaultLogging();
                 return clientBuilder.Build();
             });
