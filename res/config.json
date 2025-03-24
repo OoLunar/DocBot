@@ -2,7 +2,7 @@
     "discord": {
         "DebugGuildId": 0,
         "Token": "My Discord token.",
-        "Prefix": "d!",
+        "Prefix": "d?",
         "Repository": "OoLunar/DocBot"
     },
     "Logger": {
@@ -15,15 +15,23 @@
     "AssemblyProviderName": "git",
     "AssemblyProviders": {
         "Git": {
-            "Path": "libs/DocBot",
-            "Url": "https://github.com/OoLunar/DocBot.git",
-            "Token": "My GitHub token."
+            "Path": "libs/DSharpPlus",
+            "Url": "https://github.com/DSharpPlus/DSharpPlus.git",
+            "Token": "My GitHub token.",
+            "IgnoreProjectGlobs": [
+                "**/obsolete/**",
+                "**/*AspNet*/**"
+            ]
         },
         "LocalFile": {
-            "Path": "libs/DocBot/src/bin/Debug/net9.0/DocBot.dll"
+            "Path": "libs/DSharpPlus/DSharpPlus/bin/Debug/net9.0/DSharpPlus.dll"
         },
         "LocalProject": {
-            "Path": "libs/DocBot"
+            "Path": "libs/DSharpPlus",
+            "IgnoreProjectGlobs": [
+                "**/obsolete/**",
+                "**/*AspNet*/**"
+            ]
         },
         "NuGet": {
             "Path": "packages",
