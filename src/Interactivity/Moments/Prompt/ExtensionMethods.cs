@@ -45,7 +45,7 @@ namespace OoLunar.DocBot.Interactivity.Moments.Prompt
             data.Message = await member.SendMessageAsync(new DiscordMessageBuilder()
                 .WithAllowedMentions(Mentions.None)
                 .WithContent(question)
-                .AddComponents(button)
+                .AddActionRowComponent(new DiscordActionRowComponent([button]))
             );
 
             await data.TaskCompletionSource.Task;
@@ -89,7 +89,7 @@ namespace OoLunar.DocBot.Interactivity.Moments.Prompt
                 DiscordMessageBuilder builder = new DiscordMessageBuilder()
                     .WithAllowedMentions(Mentions.None)
                     .WithContent(question)
-                    .AddComponents(button);
+                    .AddActionRowComponent(new DiscordActionRowComponent([button]));
 
                 await textContext.RespondAsync(builder);
                 data.Message = textContext.Response;
@@ -101,10 +101,10 @@ namespace OoLunar.DocBot.Interactivity.Moments.Prompt
                     throw new InvalidOperationException("The data could not be added to the dictionary.");
                 }
 
-                await slashContext.RespondWithModalAsync(new DiscordInteractionResponseBuilder()
+                await slashContext.RespondWithModalAsync(new DiscordModalBuilder()
                     .WithTitle(question)
                     .WithCustomId(id.ToString())
-                    .AddComponents(componentCreator.CreateModalPromptButton(question, placeholder, id))
+                    .AddTextInput(componentCreator.CreateModalPromptButton(question, placeholder, id))
                 );
             }
             else

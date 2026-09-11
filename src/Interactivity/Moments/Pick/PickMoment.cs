@@ -24,25 +24,28 @@ namespace OoLunar.DocBot.Interactivity.Moments.Pick
 
             DiscordInteractionResponseBuilder responseBuilder = new(new DiscordMessageBuilder(interaction.Message));
             responseBuilder.ClearComponents();
-            responseBuilder.AddComponents(interaction.Message.Components.Mutate<DiscordSelectComponent>(
-                select => select.CustomId.StartsWith(Id.ToString(), StringComparison.Ordinal),
-                select =>
-                {
-                    List<DiscordSelectComponentOption> options = [];
-                    foreach (DiscordSelectComponentOption option in select.Options)
-                    {
-                        options.Add(new DiscordSelectComponentOption(
-                            option.Label,
-                            option.Value,
-                            option.Description,
-                            option.Value == interaction.Data.Values[0],
-                            option.Emoji
-                        ));
-                    }
+            foreach (DiscordActionRowComponent? actionRow in interaction.Message.Components.Mutate<DiscordSelectComponent>(
+                         select => select.CustomId.StartsWith(Id.ToString(), StringComparison.Ordinal),
+                         select =>
+                         {
+                             List<DiscordSelectComponentOption> options = [];
+                             foreach (DiscordSelectComponentOption option in select.Options)
+                             {
+                                 options.Add(new DiscordSelectComponentOption(
+                                     option.Label,
+                                     option.Value,
+                                     option.Description,
+                                     option.Value == interaction.Data.Values[0],
+                                     option.Emoji
+                                 ));
+                             }
 
-                    return new DiscordSelectComponent(select.CustomId, select.Placeholder, options, true, select.MinimumSelectedValues ?? 1, select.MaximumSelectedValues ?? 1);
-                }
-            ).Cast<DiscordActionRowComponent>());
+                             return new DiscordSelectComponent(select.CustomId, select.Placeholder, options, true, select.MinimumSelectedValues ?? 1, select.MaximumSelectedValues ?? 1);
+                         }
+                     ).Cast<DiscordActionRowComponent>())
+            {
+                responseBuilder.AddActionRowComponent(actionRow);
+            }
 
             await interaction.CreateResponseAsync(DiscordInteractionResponseType.UpdateMessage, responseBuilder);
         }
